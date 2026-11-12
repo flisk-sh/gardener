@@ -21,7 +21,7 @@ Wolf needs 15 to 25 seconds, longer than the image proxies in front of READMEs w
 
 ## Limits
 
-The model is the expensive part. It is capped at `DAILY_MODEL_CAP` calls a day (200) and `IP_HOURLY` per visitor (6). Over a cap a tower is still drawn, from facts only, and the page says so. The model call has a 24 s deadline.
+The model is the expensive part. It is capped at `DAILY_MODEL_CAP` calls a day (6 in `wrangler.toml`, about 2,000 of the account's free 10,000 Workers AI neurons) and `IP_HOURLY` per visitor (3). Growing a tower writes KV at most three times (the two daily counters and the tower); the per-visitor count and the "growing" marker live in the Cache API, so the account's free 1,000 KV writes a day are not used up. Over a cap a tower is still drawn, from facts only, and the page says so. The model call has a 24 s deadline.
 
 ## Run it
 
@@ -43,6 +43,6 @@ Bump `VERSION` in `src/index.js` whenever the prompt or the drawing changes, so 
 
 ## Status after the first deploy
 
-- **No cost:** nothing was bought. `DAILY_MODEL_CAP = "0"` keeps the model off, so every tower is drawn from facts only. Workers AI is free only up to a small daily allowance (about 10,000 neurons, a few towers a day); raise the cap on purpose, and only if the account cannot be billed for overage.
+- **No cost:** nothing was bought. The account is on Workers Free, where Workers AI stops at 10,000 neurons a day instead of billing; `DAILY_MODEL_CAP = "6"` keeps Gardener to about 2,000 of them. Raise it on purpose, and only if the account cannot be billed for overage.
 - **jsDelivr fallback (added 2026-11-12):** when GitHub's API refuses, the file list comes from jsDelivr (`data.jsdelivr.com/v1/packages/gh/<owner>/<repo>@HEAD?structure=flat`) and the README and manifests from raw.githubusercontent.com, both free and unlimited by key. jsDelivr cuts the list of big repos (948 of about 32,000 files for t3code), so in that mode every count is a lower bound and is written `N+`, and stars and description are missing. A GitHub token (secret `GITHUB_TOKEN`) still gives exact counts.
 - **GitHub rate limit (why the fallback exists):** unauthenticated GitHub API calls from a Cloudflare Worker share IPs and are rate limited (HTTP 403). Until a `GITHUB_TOKEN` secret is set (a personal access token with no scopes is enough, and free), live towers answer 503 "GitHub is limiting requests". Locally it works.

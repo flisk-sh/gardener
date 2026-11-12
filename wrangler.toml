@@ -9,7 +9,8 @@ routes = [{ pattern = "gardener.flisk.si", custom_domain = true }]
 [ai]
 binding = "AI"
 
-# Finished towers, the daily and per-visitor model counters, and the "growing" marker.
+# Finished towers and the two daily counters (towers grown, model calls): at most ~210 writes a day of the account's free 1,000.
+# The per-visitor hourly count and the "growing" marker live in the Cache API, which has no daily limit.
 # Create it once: `bunx wrangler@4 kv namespace create GARDENER`, then put the printed id here.
 [[kv_namespaces]]
 binding = "KV"
@@ -17,8 +18,8 @@ id = "376bd5ae20d24e9eb2b3cb2baa68fe98"
 
 [vars]
 PUBLIC_ORIGIN = "https://gardener.flisk.si"
-DAILY_MODEL_CAP = "10"    # model calls a day, all visitors. One tower costs about 450 neurons; the account is on Workers Free, whose allowance is
-                          # 10,000 neurons a day shared with inference.flisk.si and the docs Ask, and which stops at the limit instead of billing.
+DAILY_MODEL_CAP = "6"     # model calls a day, all visitors. One tower costs about 300 neurons (~3,600 tokens in, up to 1,000 out), so 6 is ~2,000
+                          # of the account's free 10,000 neurons a day, shared with inference.flisk.si (3,500) and the docs Ask on Helpdock (~2,800).
 GENERATE_DAILY_CAP = "100" # towers grown a day, with or without the model: protects GitHub, the CPU limit and the account-wide 100,000 requests a day
 IP_HOURLY = "3"           # model calls an hour, one visitor
 

@@ -1,5 +1,5 @@
 import { beforeEach, expect, test } from 'bun:test';
-import worker, { _clearMemory } from '../src/index.js';
+import worker, { _clearLocal, _clearMemory } from '../src/index.js';
 import { loadFacts } from '../src/github.js';
 import { fallbackTower, mergeTower, parseTower, supported } from '../src/wolf.js';
 import { renderTower } from '../src/tower.js';
@@ -39,6 +39,7 @@ const fakeKv = () => {
 };
 beforeEach(() => {
   _clearMemory();
+  _clearLocal();
   githubCalls = 0;
 });
 
@@ -139,6 +140,21 @@ test('over the daily cap the tower is still drawn, from facts only, without call
     expect(res.status).toBe(200);
     expect(res.headers.get('x-gardener-source')).toBe('facts-only');
     expect(modelCalls).toBe(0);
+  });
+});
+
+test('growing a tower writes KV only for the two daily counters and the tower (free plan: 1,000 writes a day)', async () => {
+  await withGithub(async () => {
+    const kv = fakeKv();
+    const puts = [];
+    const put = kv.put;
+    kv.put = async (k, v, o) => { puts.push(k); return put(k, v, o); };
+    const waits = [];
+    const env = { KV: kv, AI: { run: async () => ({ response: MODEL_ANSWER }) } };
+    // A README <img>: the placeholder, then the tower grows in the background.
+    await worker.fetch(new Request('https://g.example/o/r.svg', { headers: { 'cf-connecting-ip': '1.2.3.4' } }), env, { waitUntil: (p) => waits.push(p) });
+    await Promise.all(waits);
+    expect(puts.map((k) => k.split(':')[0]).sort()).toEqual(['cap', 'gen', 'tower']);
   });
 });
 
