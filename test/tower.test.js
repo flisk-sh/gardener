@@ -80,7 +80,9 @@ test('Wolf words are used when they are valid', async () => {
   const built = await buildTower('o', 'r', env, { fetchImpl: fakeFetch });
   expect(built.source).toContain('wolf');
   expect(built.tower.title).toBe('DEMO TOWER');
-  expect(built.tower.insets.map((i) => i.kind)).toEqual(['tests']);
+  // the model's drawing comes first, then every drawing the facts support
+  expect(built.tower.insets[0].kind).toBe('tests');
+  expect(built.tower.insets.map((i) => i.kind)).not.toContain('bogus');
 });
 
 test('labels cannot inject markup into the SVG', () => {

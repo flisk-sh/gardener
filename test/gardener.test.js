@@ -1,7 +1,7 @@
 import { beforeEach, expect, test } from 'bun:test';
 import worker, { _clearMemory } from '../src/index.js';
 import { loadFacts } from '../src/github.js';
-import { fallbackTower, parseTower, supported } from '../src/wolf.js';
+import { fallbackTower, mergeTower, parseTower, supported } from '../src/wolf.js';
 import { renderTower } from '../src/tower.js';
 
 const FILES = {
@@ -399,4 +399,38 @@ test('"not in the repo" is corrected when the file names show the service, and a
   expect(t.cloud.label).toBe('GITHUB ACTIONS (IN THE REPO)');
   expect(t.red.title).toBe('');
   expect(t.core.note).toBe('EXACT PIN');
+});
+
+test('the Node range keeps its > and <, and the pentagon name is not cut', () => {
+  const t = parseTower(JSON.stringify({ runtime: { bar: 'NODE >=22.12.0' }, upper: { pentagon: ['COMMANDER', ''], triangle: 'TYPESCRIPT-ESLINT' } }), { counts: {}, stack: { engines: { node: '>=22.12.0' }, rootDependencies: ['commander@^15.0.0', 'typescript-eslint@1.0.0'], workspaceVersions: {} } });
+  expect(t.runtime.bar).toBe('NODE >=22.12.0');
+  expect(t.upper.pentagon[0]).toBe('COMMANDER');
+  expect(renderTower(t)).toContain('NODE &gt;=22.12.0');
+});
+
+test('a sparse model answer is topped up with the drawings the facts support, and the README command wins', () => {
+  const facts = {
+    repo: 'o/cli', source: 'ungh', stars: 5, agentsFile: 'x', agentsRules: ['Never edit generated files by hand'],
+    counts: { files: 300, tests: 40, patches: 0, generated: 4, nativeDirs: [], filesByLanguage: [['TypeScript', 200]] },
+    workspaces: [], workspaceCount: 0, workspaceGroups: [], topLevel: [{ name: 'docs', files: 120 }, { name: 'cli', files: 100 }, { name: 'tests', files: 40 }],
+    stack: { packageManager: 'bun@1.0.0', engines: { node: '>=22' }, rootDependencies: ['react@^19'], workspaceVersions: {}, scripts: ['build'], lockfile: 'bun' },
+    readme: { headings: [], firstCommand: 'npx o/cli demo', excerpt: '' },
+  };
+  const model = parseTower(JSON.stringify({ title: 'O/CLI', runtime: { toolNote: 'FAST BUILD' }, braces: { right: 'SOMEONE CODING' }, insets: [{ kind: 'tests', caption: '40 TEST FILES' }, { kind: 'nosign', caption: 'NEVER EDIT GENERATED FILES' }] }), facts);
+  expect(model.insets.map((i) => i.kind)).toEqual(['tests', 'nosign']);
+  const { tower } = mergeTower(model, fallbackTower(facts));
+  expect(tower.insets.map((i) => i.kind)).toEqual(['tests', 'nosign', 'scroll', 'tiny']);
+  expect(tower.braces.right).toBe('SOMEONE TYPING npx o/cli demo');
+  expect(tower.runtime.toolNote).toBe('PINNED');
+});
+
+test('the agent file rules and the README first line are collected as facts', async () => {
+  const f = await loadFacts('o', 'r', { fetchImpl: (u) => {
+    const x = String(u);
+    if (x.endsWith('/AGENTS.md')) return new Response('# Agents\n\nWe like tests.\n\n## Rules\n\n- Never edit generated files by hand.\n- Do not commit .env files.\n- Be kind.\n');
+    if (x.endsWith('/README.md')) return new Response('# T\n\n[![ci](x)](y)\n\nT is a small tool that grows towers from repos.\n');
+    return fakeFetch(x);
+  } });
+  expect(f.agentsRules).toEqual(['Never edit generated files by hand.', 'Do not commit .env files.']);
+  expect(f.readme.firstLine).toBe('T is a small tool that grows towers from repos.');
 });

@@ -6,7 +6,7 @@ import { ICON, page, resultPage } from './page.js';
 import SAMPLE from './sample.js';
 
 // Bump when the prompt or the drawing changes: it is part of the cache key, so old towers are not served for a week.
-export const VERSION = 'v7';
+export const VERSION = 'v8';
 const SVG = { 'content-type': 'image/svg+xml; charset=utf-8', 'access-control-allow-origin': '*' };
 const TTL_WOLF = 7 * 86400;
 const TTL_PLAIN = 3600;

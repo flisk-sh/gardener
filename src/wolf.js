@@ -14,7 +14,7 @@ export function supported(kind, facts) {
   switch (kind) {
     case 'tests': return c.tests > 0;
     case 'notes': return false; // the facts carry no TODO count
-    case 'nosign': return /\b(never|do not|don't)\b/i.test(facts.agentsFile || '');
+    case 'nosign': return (facts.agentsRules || []).length > 0 || /\b(never|do not|don't)\b/i.test(facts.agentsFile || '');
     case 'scroll': return c.generated > 0;
     case 'ghost': return (c.nativeDirs || []).length > 0;
     case 'tape': return c.patches > 0;
@@ -40,7 +40,7 @@ const SCHEMA = `{
  "left": {"title": "<biggest app or dir, max 16>", "stat": "<its file count, max 22>", "note": "<max 40>"},
  "right": {"title": "<second app or dir, max 16>", "stat": "<its file count, max 22>", "note": "<max 24>"},
  "neck": {"title": "<the thin fragile thing everything leans on, max 18>", "note": "<max 34>"},
- "upper": {"pentagon": ["<max 8>", "<max 8>"], "pentagonNote": "<max 14>", "triangle": "<max 12>", "plank": "<max 22>"},
+ "upper": {"pentagon": ["<max 10>", "<max 10>"], "pentagonNote": "<max 14>", "triangle": "<max 14>", "plank": "<max 22>"},
  "red": {"title": "<a pinned or risky dependency, max 20>", "note": "<max 22>"},
  "crane": {"title": "<AI AGENTS or similar, max 14>", "note": "<max 36>"},
  "oss": "<whose unpaid work it stands on, max 48>",
@@ -61,7 +61,7 @@ const EXAMPLE_TOWER = {
   left: { title: 'apps/storefront', stat: '300 FILES', note: 'THE WHOLE SHOP WINDOW' },
   right: { title: 'services/orders', stat: '120 FILES', note: 'WHERE MONEY HAPPENS' },
   neck: { title: '4 PATCHES', note: 'patches/ : EDITED BY HAND' },
-  upper: { pentagon: ['ELECTRON', '33.2.0'], pentagonNote: 'DESKTOP SHELL', triangle: 'REACT 19', plank: 'pnpm start' },
+  upper: { pentagon: ['ELECTRON', '33.2.0'], pentagonNote: '', triangle: 'REACT 19', plank: 'pnpm start' },
   red: { title: 'ELECTRON 33.2.0', note: 'PINNED' },
   crane: { title: 'AI AGENTS', note: 'WRITING THE NEXT PR' },
   oss: 'THE MAINTAINERS OF REACT AND ELECTRON',
@@ -82,7 +82,7 @@ const EXAMPLE2_TOWER = {
   left: { title: 'crates/core', stat: '90 FILES', note: 'THE ACTUAL COMPRESSOR' },
   right: { title: 'crates/ui', stat: '55 FILES', note: 'THE BUTTON' },
   neck: { title: 'GPU KERNELS', note: 'gpu-kernels/ : ONE SHADER AT A TIME' },
-  upper: { pentagon: ['TAURI', '1.6.0'], pentagonNote: 'A WEBVIEW', triangle: 'WGPU 0.19', plank: 'cargo run' },
+  upper: { pentagon: ['TAURI', '1.6.0'], pentagonNote: '', triangle: 'WGPU 0.19', plank: 'cargo run' },
   red: { title: 'WGPU 0.19.1', note: 'EXACT PIN' },
   crane: { title: '', note: '' },
   oss: 'THE PEOPLE WHO WRITE GPU DRIVERS',
@@ -118,7 +118,7 @@ export function buildMessages(facts) {
     '- Use ONLY facts from FACTS. Every number, version and name you write must appear in FACTS. If a fact is missing, leave that field out instead of inventing it.',
     '- ALL CAPS, except package names, file paths and versions, which keep their spelling.',
     '- Short and dry. A joke is fine when the fact is already funny. Never insult a person.',
-    '- insets: up to 8, each a different kind: tests = the test-file count, notes = TODO or FIXME count, nosign = a thing the docs say never to do, scroll = a huge generated file, ghost = a native or odd dependency, tiny = the smallest part of the repo, tape = patched or vendored code, rocket = native Rust or Go code, bird = an app store or external gatekeeper, shark = live data that must not be touched. Use a kind only when FACTS support it.',
+    '- insets: up to 8, each a different kind: tests = the test-file count, notes = TODO or FIXME count, nosign = a thing the docs say never to do (FACTS.agentsRules lists them: shorten one), scroll = a huge generated file, ghost = a native or odd dependency, tiny = the smallest part of the repo, tape = patched or vendored code, rocket = native Rust or Go code, bird = an app store or external gatekeeper, shark = live data that must not be touched. Use a kind only when FACTS support it.',
   ].join('\n');
   return [
     { role: 'system', content: system },
@@ -164,7 +164,7 @@ const clip = (s, max) => {
   const closed = (whole || cut).replace(/\s*\([^)]*$/, '');
   return closed || whole || cut;
 };
-const str = (v, max) => (typeof v === 'string' ? clip(v.replace(/[\u0000-\u001f\u007f<>]/g, ' ').replace(/\s+/g, ' ').trim(), max) : '');
+const str = (v, max) => (typeof v === 'string' ? clip(v.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim(), max) : '');
 const arr = (v, n) => (Array.isArray(v) ? v.slice(0, n) : []);
 
 // The first word of a label that names a package or folder (core, red, the pentagon and triangle) must appear in the facts: a model that has heard
@@ -228,9 +228,9 @@ export function parseTower(text, facts, { grounded = true } = {}) {
     right: { title: g(o(obj.right).title, 16, 'right.title'), stat: g(o(obj.right).stat, 22, 'right.stat'), note: g(o(obj.right).note, 24, 'right.note') },
     neck: { title: g(o(obj.neck).title, 18, 'neck.title'), note: g(o(obj.neck).note, 34, 'neck.note') },
     upper: {
-      pentagon: arr(o(obj.upper).pentagon, 2).map((s, i) => g(s, 8, `upper.pentagon.${i}`)),
+      pentagon: arr(o(obj.upper).pentagon, 2).map((s, i) => g(s, 10, `upper.pentagon.${i}`)),
       pentagonNote: g(o(obj.upper).pentagonNote, 14, 'upper.pentagonNote'),
-      triangle: g(o(obj.upper).triangle, 12, 'upper.triangle'),
+      triangle: g(o(obj.upper).triangle, 14, 'upper.triangle'),
       plank: g(o(obj.upper).plank, 22, 'upper.plank'),
     },
     red: { title: g(o(obj.red).title, 20, 'red.title'), note: g(o(obj.red).note, 22, 'red.note') },
@@ -327,7 +327,7 @@ export function fallbackTower(facts) {
   const parts = (facts.workspaces || []).length >= 2 ? facts.workspaces : (facts.topLevel || []).filter((t) => t.name !== '(root)').map((t) => ({ name: `${t.name}/`, files: t.files }));
   const pm = facts.stack?.packageManager ? String(facts.stack.packageManager).replace('@', ' ') : facts.stack?.lockfile || '';
   const small = [...parts].filter((x) => x.files >= 3).sort((a, b) => a.files - b.files)[0];
-  const rule = /\b(never|do not|don't)\b[^.\n]{6,70}/i.exec(facts.agentsFile || '')?.[0];
+  const rule = (facts.agentsRules || [])[0] || /\b(never|do not|don't)\b[^.\n]{6,70}/i.exec(facts.agentsFile || '')?.[0];
   const share = (n) => (facts.counts.files > 0 ? `${Math.max(1, Math.round((n / facts.counts.files) * 100))}% OF THE FILES` : '');
   const scripts = facts.stack?.scripts || [];
   const script = ['dev', 'start', 'build', 'test'].find((x) => scripts.includes(x)) || scripts[0];
@@ -384,6 +384,13 @@ export function mergeTower(model, plain) {
     return p;
   };
   const tower = pick(model, plain);
+  // The drawings the model chose come first; the plain tower adds every other drawing the facts support, so a sparse answer is not a sparse tower.
+  const kinds = new Set(tower.insets.map((i) => i.kind));
+  tower.insets = [...tower.insets, ...plain.insets.filter((i) => !kinds.has(i.kind))].slice(0, 8);
+  // what the README says to type is more specific than "SOMEONE CODING", and true
+  if (plain.braces?.right) tower.braces.right = plain.braces.right;
+  // a note on the package manager is a fact (pinned, lockfile), not an opinion ("FAST BUILD")
+  if (!/\b(PIN|LOCK|EXACT)/i.test(tower.runtime.toolNote || '')) tower.runtime.toolNote = plain.runtime.toolNote;
   tower.dropped = model.dropped || [];
   return { tower, filled };
 }

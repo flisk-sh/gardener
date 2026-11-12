@@ -99,7 +99,7 @@ export async function loadFacts(owner, repo, { fetchImpl = fetch, token } = {}) 
     viaJsdelivr ? null : getJson(fetchImpl, `https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`, headers),
     viaJsdelivr ? null : getJson(fetchImpl, `https://api.github.com/repos/${owner}/${repo}/languages`, headers),
     getRaw(fetchImpl, owner, repo, branch, 'README.md', 60_000),
-    getRaw(fetchImpl, owner, repo, branch, 'AGENTS.md', 6_000).then((t) => t ?? getRaw(fetchImpl, owner, repo, branch, 'CLAUDE.md', 6_000)),
+    getRaw(fetchImpl, owner, repo, branch, 'AGENTS.md', 12_000).then((t) => t ?? getRaw(fetchImpl, owner, repo, branch, 'CLAUDE.md', 12_000)),
     getRaw(fetchImpl, owner, repo, branch, 'package.json'),
   ]);
   if (!viaJsdelivr) {
@@ -220,7 +220,11 @@ export async function loadFacts(owner, repo, { fetchImpl = fetch, token } = {}) 
       scripts: pkg?.scripts ? Object.keys(pkg.scripts).slice(0, 8) : [],
       lockfile,
     },
-    readme: { headings, firstCommand: firstCommand.slice(0, 80), excerpt: readmeText.slice(0, 1800).replace(/\s+/g, ' ').trim() },
+    readme: { headings, firstLine: (readmeText.split(/\n{2,}/).map((x) => x.replace(/!?\[[^\]]*\]\([^)]*\)|<[^>]+>|[#*_`>]/g, '').replace(/\s+/g, ' ').trim()).find((x) => x.length >= 30 && !/^(\||-|\d+\.)/.test(x)) || '').slice(0, 200), firstCommand: firstCommand.slice(0, 80), excerpt: readmeText.slice(0, 1800).replace(/\s+/g, ' ').trim() },
     agentsFile: agents ? agents.slice(0, 1500).replace(/\s+/g, ' ').trim() : null,
+    // what the agent file forbids, one short sentence each: the best material for the "never do this" drawing
+    agentsRules: agents
+      ? [...new Set(agents.replace(/[`*_#>]/g, '').split(/(?<=[.!?])\s+|\n+/).map((x) => x.trim().replace(/^[-\d.\s]+/, '')).filter((x) => /\b(never|do not|don't|must not)\b/i.test(x) && x.length >= 12 && x.length <= 90))].slice(0, 4)
+      : [],
   };
 }
