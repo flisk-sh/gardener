@@ -206,9 +206,9 @@ export function renderTower(tower, { seed = tower.title || 'tower' } = {}) {
   cluster(560, 840, 700, 880, 0.3);
   poly([[560, 800], [640, 780], [668, 840], [610, 878], [556, 850]], '#fff', 2.6);
   const pent = t.upper?.pentagon || [];
-  text(612, 816, pent[0], 19, { maxWidth: 62 });
-  text(612, 836, pent[1], 19, { maxWidth: 62 });
-  text(610, 856, t.upper?.pentagonNote, 11, { maxWidth: 62 });
+  text(612, 816, pent[0], 19, { maxWidth: 78 });
+  text(612, 836, pent[1], 19, { maxWidth: 78 });
+  text(610, 856, t.upper?.pentagonNote, 11, { maxWidth: 78 });
   cluster(590, 790, 500, 700, 0.4);
   poly([[640, 660], [760, 645], [730, 580]], '#fff', 2.6);
   text(708, 636, t.upper?.triangle, 14, { maxWidth: 70 });
