@@ -28,7 +28,7 @@ The model is the expensive part. It is capped at `DAILY_MODEL_CAP` calls a day (
 ```bash
 bun test                                     # 19 tests, fake GitHub and fake model
 PORT=8787 WOLF_KEY=fi-... bun scripts/serve.mjs     # local site on the hosted flisk-wolf
-bun scripts/make.mjs pingdotgg/t3code        # one tower to a file (Workers AI through wrangler's login, or WOLF_KEY)
+bun scripts/make.mjs pingdotgg/t3code        # one tower to a file (WOLF_KEY=fi-... for the hosted flisk-wolf, else facts only)
 ```
 
 ## Deploy (done 2026-11-12: Worker + KV `GARDENER` on the Flisk Cloudflare account, custom domain gardener.flisk.si)

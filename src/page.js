@@ -64,7 +64,7 @@ function layout({ title, origin, body, path = '/' }) {
 <style>${CSS}</style><script src="https://flisk.si/assets/bar.js" defer></script></head><body>
 <header class="top stage"><nav class="wrap" aria-label="Site"><a href="/"><img src="/icon.svg" alt="" width="26" height="26">Gardener</a><a href="https://flisk.sh">Flisk</a></nav></header>
 ${body}
-<footer><div class="wrap">Gardener: labels by the Wolf model (flisk-wolf), numbers counted from the repo, nothing stored but the finished tower. Made by <a href="https://flisk.sh">Flisk</a>.</div></footer>
+<footer><div class="wrap">Gardener: labels by the Wolf model (flisk-wolf), numbers counted from the repo, nothing stored but the finished tower. <a href="https://github.com/flisk-sh/gardener">Open source</a>, made by <a href="https://flisk.sh">Flisk</a>.</div></footer>
 </body></html>`;
 }
 
