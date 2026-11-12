@@ -392,3 +392,11 @@ test('a package name the facts do not contain is dropped', () => {
   expect(t.right.title).toBe('');
   expect(t.dropped.join('|')).toContain('core.title (the name is not in the facts)');
 });
+
+test('"not in the repo" is corrected when the file names show the service, and a repeated label is folded into the core', () => {
+  const facts = { hints: ['GITHUB ACTIONS'], counts: {}, stack: { rootDependencies: ['@crawlee/core@4.0.0-rc.2'], workspaceVersions: {} } };
+  const t = parseTower(JSON.stringify({ cloud: { word: 'github', label: 'GITHUB ACTIONS (NOT IN THE REPO)' }, core: { title: '@crawlee/core' }, red: { title: '@crawlee/core', note: 'EXACT PIN' } }), facts);
+  expect(t.cloud.label).toBe('GITHUB ACTIONS (IN THE REPO)');
+  expect(t.red.title).toBe('');
+  expect(t.core.note).toBe('EXACT PIN');
+});

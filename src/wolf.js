@@ -275,7 +275,17 @@ export function parseTower(text, facts, { grounded = true } = {}) {
       dropped.push(`${name.split('.')[0]}.${note} (a ^ or ~ range is not a pin)`);
     }
   }
-  // the same thing twice (the fragile neck and the red pinned label) reads as a glitch
+  // a service the file names show IS in the repo, whatever the model's copied wording says
+  if (/NOT IN (THE )?REPO/i.test(t.cloud.label) && (facts?.hints || []).some((h) => t.cloud.label.toUpperCase().includes(h))) {
+    t.cloud.label = t.cloud.label.replace(/\(?NOT IN (THE )?REPO\)?/i, '(IN THE REPO)');
+    dropped.push('cloud.label (the file names show it is in the repo)');
+  }
+  // the same thing twice (the core and the red label, or the fragile neck and the red label) reads as a glitch
+  if (t.red.title && t.red.title === t.core.title) {
+    t.core.note = [t.core.note, t.red.note].filter(Boolean).join(' · ').slice(0, 30);
+    t.red = { title: '', note: '' };
+    dropped.push('red (the same as the core)');
+  }
   if (t.red.title && t.red.title === t.neck.title) {
     t.red = { title: '', note: '' };
     dropped.push('red (the same as the neck)');
