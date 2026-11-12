@@ -206,10 +206,26 @@ export async function loadFacts(owner, repo, { fetchImpl = fetch, token } = {}) 
   }
   const jsDeps = pkg ? Object.entries({ ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) }).slice(0, 30).map(([n, v]) => `${n}@${String(v).slice(0, 24)}`) : [];
   const other = otherEcosystem({ goMod, cargo, pyproject, requirements });
-  const deps = jsDeps.length ? jsDeps : other.deps;
+  // a root manifest without dependencies in a monorepo: read a few nested ones (services/app/web/package.json)
+  let nestedDeps = [];
+  if (!jsDeps.length && !other.deps.length) {
+    const nested = paths.filter((x) => /(^|\/)package\.json$/.test(x) && x !== 'package.json' && x.split('/').length <= 5).sort((a, b) => a.split('/').length - b.split('/').length || a.localeCompare(b)).slice(0, 4);
+    const raws = await Promise.all(nested.map((x) => getRaw(fetchImpl, owner, repo, branch, x, 100_000)));
+    for (const raw of raws) {
+      try {
+        const j = raw ? JSON.parse(raw) : null;
+        for (const [n, v] of Object.entries({ ...(j?.dependencies || {}), ...(j?.devDependencies || {}) })) nestedDeps.push(`${n}@${String(v).slice(0, 24)}`);
+      } catch {
+        // an unreadable nested manifest only means fewer facts
+      }
+    }
+    nestedDeps = [...new Set(nestedDeps)].slice(0, 30);
+  }
+  const deps = jsDeps.length ? jsDeps : other.deps.length ? other.deps : nestedDeps;
   const compat = /^compatibility_date\s*=\s*"([\d-]+)"/m.exec(wrangler || '')?.[1];
   if (!other.runtime && compat) other.runtime = `WORKERS ${compat}`;
-  const noDependencies = Boolean(pkg) && deps.length === 0;
+  const lockfileSeen = paths.some((x) => /(^|\/)(bun\.lockb?|pnpm-lock\.yaml|package-lock\.json|yarn\.lock)$/.test(x));
+  const noDependencies = Boolean(pkg) && deps.length === 0 && !lockfileSeen && paths.filter((x) => /(^|\/)package\.json$/.test(x)).length <= 1;
 
   // The workspaces' own manifests carry the versions that matter (Electron, Expo, React Native...).
   const wsNames = Object.entries(workspaces).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k]) => k);

@@ -467,3 +467,14 @@ test('a repo with a package.json and no dependencies says so, and a diagram is n
   expect(t.core.title).toBe('NOTHING');
   expect(t.runtime.bar).toBe('WORKERS 2026-11-01');
 });
+
+test('fact-backed drawings: bird for a host, ghost for a side language, shark for a database the README names', () => {
+  const t = fallbackTower({
+    repo: 'o/r', source: 'ungh', hints: ['GITHUB ACTIONS', 'RENDER'], description: 'A service on Postgres',
+    counts: { files: 100, tests: 3, generated: 0, patches: 0, nativeDirs: [], filesByLanguage: [['TypeScript', 80], ['Swift', 2]] },
+    topLevel: [], workspaces: [], stack: {}, readme: {},
+  });
+  const kinds = t.insets.map((i) => i.kind);
+  expect(kinds).toEqual(expect.arrayContaining(['ghost', 'bird', 'shark']));
+  expect(t.insets.find((i) => i.kind === 'bird').caption).toBe('DEPLOY WAITS ON RENDER');
+});

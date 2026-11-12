@@ -344,6 +344,15 @@ export function fallbackTower(facts) {
   if (facts.counts.generated > 0) insets.push({ kind: 'scroll', caption: count(facts.counts.generated, 'GENERATED FILE') });
   if (rule) insets.push({ kind: 'nosign', caption: clip(up(rule), 30) });
   if (small && parts.length > 2) insets.push({ kind: 'tiny', caption: `${small.name} (${count(small.files, 'FILE')})`.slice(0, 30) });
+  const mainLang = langs[0]?.[0];
+  const oddLang = langs.slice(1).find(([n, c]) => ['Swift', 'Kotlin', 'Objective-C', 'C++', 'C', 'C#', 'Java'].includes(n) && c > 0);
+  if (oddLang && (facts.counts.nativeDirs || []).length === 0) insets.push({ kind: 'ghost', caption: count(oddLang[1], `${up(oddLang[0])} FILE`).slice(0, 30) });
+  const lowLang = langs.slice(mainLang === 'Rust' ? 99 : 1).find(([n, c]) => ['Rust', 'Go', 'Zig'].includes(n) && c > 0);
+  if (lowLang && (facts.counts.nativeDirs || []).length === 0) insets.push({ kind: 'rocket', caption: count(lowLang[1], `${up(lowLang[0])} FILE`).slice(0, 30) });
+  const gate = (facts.hints || []).find((h) => /RENDER|VERCEL|NETLIFY|FLY|CLOUDFLARE|HEROKU|RAILWAY|APP STORE|PLAY/i.test(h));
+  if (gate) insets.push({ kind: 'bird', caption: `DEPLOY WAITS ON ${gate}`.slice(0, 30) });
+  const wantsData = /\b(postgres(ql)?|mysql|mongodb|redis|sqlite|database|production)\b/i.exec(`${facts.description || ''} ${facts.readme?.excerpt || ''} ${facts.readme?.firstLine || ''} ${(facts.topics || []).join(' ')}`);
+  if (wantsData) insets.push({ kind: 'shark', caption: `THE README SAYS "${wantsData[0].toUpperCase()}"`.slice(0, 30) });
   const HINT_WORD = { 'GITHUB ACTIONS': 'ci', DOCKER: 'docker', 'CLOUDFLARE WORKERS': 'workers', VERCEL: 'vercel', NETLIFY: 'netlify', 'FLY.IO': 'fly', RENDER: 'render', TERRAFORM: 'cloud', KUBERNETES: 'k8s' };
   return {
     title: up(name).slice(0, 24),
