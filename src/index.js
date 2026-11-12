@@ -44,15 +44,32 @@ const safe = async (fn, fallback = null) => {
   }
 };
 
+// ---- per-data-center scratch values in the Cache API: free and unmetered, unlike KV (1,000 writes a day for the whole account).
+// A value lives in one Cloudflare location only, so it suits what may be approximate: one visitor's hourly count (a visitor stays on
+// one location) and the "growing" marker. The global daily caps stay in KV, where they must be exact.
+const localMemory = new Map();
+export const _clearLocal = () => localMemory.clear();
+const localUrl = (key) => `https://gardener.local/${encodeURIComponent(key)}`;
+async function localGet(key) {
+  const cache = globalThis.caches?.default;
+  if (!cache) return localMemory.get(key) ?? null;
+  return safe(async () => { const r = await cache.match(localUrl(key)); return r ? r.text() : null; }, null);
+}
+async function localPut(key, value, ttl) {
+  const cache = globalThis.caches?.default;
+  if (!cache) return void localMemory.set(key, value);
+  await safe(() => cache.put(localUrl(key), new Response(value, { headers: { 'cache-control': `max-age=${ttl}` } })));
+}
+
 // ---- limits: the model is the expensive part, so it is capped per day and per visitor. Over a cap the tower is still drawn, from facts only.
 async function allowModel(env, ip) {
   if (!env.KV) return true;
   const now = new Date().toISOString();
   const dailyKey = `cap:${now.slice(0, 10)}`;
   const ipKey = `ip:${ip}:${now.slice(0, 13)}`;
-  const [d, i] = await Promise.all([safe(() => env.KV.get(dailyKey)), safe(() => env.KV.get(ipKey))]);
-  if (Number(d || 0) >= Number(env.DAILY_MODEL_CAP ?? 200) || Number(i || 0) >= Number(env.IP_HOURLY ?? 6)) return false;
-  await Promise.all([safe(() => env.KV.put(dailyKey, String(Number(d || 0) + 1), { expirationTtl: 172800 })), safe(() => env.KV.put(ipKey, String(Number(i || 0) + 1), { expirationTtl: 7200 }))]);
+  const [d, i] = await Promise.all([safe(() => env.KV.get(dailyKey)), localGet(ipKey)]);
+  if (Number(d || 0) >= Number(env.DAILY_MODEL_CAP ?? 6) || Number(i || 0) >= Number(env.IP_HOURLY ?? 3)) return false;
+  await Promise.all([safe(() => env.KV.put(dailyKey, String(Number(d || 0) + 1), { expirationTtl: 172800 })), localPut(ipKey, String(Number(i || 0) + 1), 3600)]);
   return true;
 }
 
@@ -165,8 +182,8 @@ export default {
     const wait = url.searchParams.get('wait') === '1' || !env.KV;
     if (!wait) {
       const pendingKey = `pending:${VERSION}:${full.toLowerCase()}`;
-      if (!(await safe(() => env.KV.get(pendingKey)))) {
-        await safe(() => env.KV.put(pendingKey, '1', { expirationTtl: 120 }));
+      if (!(await localGet(pendingKey))) {
+        await localPut(pendingKey, '1', 120);
         ctx.waitUntil(grow(owner, repo, env, { ip }).catch(() => {}));
       }
       return new Response(placeholder(full), { headers: { ...SVG, 'cache-control': 'public, max-age=20' } });
