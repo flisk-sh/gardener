@@ -13,11 +13,12 @@ binding = "AI"
 # Create it once: `bunx wrangler@4 kv namespace create GARDENER`, then put the printed id here.
 [[kv_namespaces]]
 binding = "KV"
-id = "REPLACE_WITH_THE_ID_FROM_kv_namespace_create"
+id = "376bd5ae20d24e9eb2b3cb2baa68fe98"
 
 [vars]
 PUBLIC_ORIGIN = "https://gardener.flisk.si"
-DAILY_MODEL_CAP = "200"   # model calls a day, all visitors; over it a tower is drawn from facts only
+DAILY_MODEL_CAP = "0"     # model calls a day, all visitors. 0 = the model is never called: every tower is drawn from facts only, at no cost.
+                          # Workers AI is free only up to a small daily allowance (about 10,000 neurons, a few towers); raise this only on purpose.
 IP_HOURLY = "6"           # model calls an hour, one visitor
 
 # Optional secrets:

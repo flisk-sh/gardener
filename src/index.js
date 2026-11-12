@@ -147,7 +147,7 @@ export default {
       return new Response(placeholder(full), { headers: { ...SVG, 'cache-control': 'public, max-age=20' } });
     }
     const grown = await grow(owner, repo, env, { ip });
-    if (grown.error) return text(grown.error === 'not-found' ? 'repo not found' : 'GitHub error', grown.status || 502);
+    if (grown.error) return text({ 'not-found': 'repo not found', 'github-rate-limited': 'GitHub is limiting requests from this server right now: try again in a few minutes' }[grown.error] || 'GitHub error', grown.status || 502);
     return svgResponse(grown.entry);
   },
 };

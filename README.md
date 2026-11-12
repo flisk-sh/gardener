@@ -31,12 +31,17 @@ PORT=8787 WOLF_KEY=fi-... bun scripts/serve.mjs     # local site on the hosted f
 bun scripts/make.mjs pingdotgg/t3code        # one tower to a file (Workers AI through wrangler's login, or WOLF_KEY)
 ```
 
-## Deploy (not done yet)
+## Deploy (done 2026-11-12: Worker + KV `GARDENER` on the Flisk Cloudflare account, custom domain gardener.flisk.si)
 
 1. `bunx wrangler@4 kv namespace create GARDENER`, then put the printed id in `wrangler.toml`.
 2. Optional: `bunx wrangler@4 secret put GITHUB_TOKEN` (GitHub allows 60 API calls an hour without one; each new tower needs about 12), and `WOLF_KEY` to call the hosted flisk-wolf at inference.flisk.si instead of the Workers AI binding. The binding runs the same Qwen2.5-Coder 32B and needs no secret; the hosted model has its own shared daily limit (100) that a public site would use up.
 3. `bunx wrangler@4 deploy`. The custom domain `gardener.flisk.si` is created on the flisk.si zone.
-4. Needs the **Workers Paid** plan: growing a tower takes about 40 to 60 ms of CPU for a big repo (a 32,000-file tree), over the 10 ms of the free plan.
+4. Probably needs the **Workers Paid** plan (not tested: the live site could not reach GitHub, see below): growing a tower takes about 40 to 60 ms of CPU for a big repo (a 32,000-file tree), over the 10 ms of the free plan.
 5. Then: add Gardener to the flisk.si product catalog (the bar), an icon in flisk-emoji, a GitHub repo, and a Source link in the footer of `src/page.js`.
 
 Bump `VERSION` in `src/index.js` whenever the prompt or the drawing changes, so old towers are not served from the cache.
+
+## Status after the first deploy
+
+- **No cost:** nothing was bought. `DAILY_MODEL_CAP = "0"` keeps the model off, so every tower is drawn from facts only. Workers AI is free only up to a small daily allowance (about 10,000 neurons, a few towers a day); raise the cap on purpose, and only if the account cannot be billed for overage.
+- **GitHub rate limit:** unauthenticated GitHub API calls from a Cloudflare Worker share IPs and are rate limited (HTTP 403). Until a `GITHUB_TOKEN` secret is set (a personal access token with no scopes is enough, and free), live towers answer 503 "GitHub is limiting requests". Locally it works.

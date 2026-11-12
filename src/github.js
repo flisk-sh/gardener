@@ -6,9 +6,10 @@ export function validRepo(owner, repo) {
 
 const UA = { 'user-agent': 'gardener' };
 
+// { json } on success, { status } otherwise: a rate limit must not look like a missing repo.
 async function getJson(fetchImpl, url, headers) {
   const r = await fetchImpl(url, { headers });
-  return r.ok ? r.json() : null;
+  return r.ok ? { json: await r.json() } : { status: r.status };
 }
 
 async function getRaw(fetchImpl, owner, repo, ref, path, limit = 200_000) {
@@ -28,8 +29,12 @@ const SKIP = /(^|\/)(node_modules|dist|build|vendor|\.git|\.next|coverage|target
 // fetchImpl is injectable for tests.
 export async function loadFacts(owner, repo, { fetchImpl = fetch, token } = {}) {
   const headers = { ...UA, accept: 'application/vnd.github+json', ...(token ? { authorization: `Bearer ${token}` } : {}) };
-  const meta = await getJson(fetchImpl, `https://api.github.com/repos/${owner}/${repo}`, headers);
-  if (!meta) return { error: 'not-found', status: 404 };
+  const res = await getJson(fetchImpl, `https://api.github.com/repos/${owner}/${repo}`, headers);
+  if (!res.json) {
+    if (res.status === 404) return { error: 'not-found', status: 404 };
+    return { error: res.status === 403 || res.status === 429 ? 'github-rate-limited' : 'github-error', status: 503 };
+  }
+  const meta = res.json;
   const branch = typeof meta.default_branch === 'string' ? meta.default_branch : 'HEAD';
 
   const [tree, languages, readme, agents, rootPkg] = await Promise.all([
@@ -40,7 +45,7 @@ export async function loadFacts(owner, repo, { fetchImpl = fetch, token } = {}) 
     getRaw(fetchImpl, owner, repo, branch, 'package.json'),
   ]);
 
-  const paths = Array.isArray(tree?.tree) ? tree.tree.filter((t) => t.type === 'blob' && typeof t.path === 'string' && !SKIP.test(t.path)).map((t) => t.path) : [];
+  const paths = Array.isArray(tree?.json?.tree) ? tree.json.tree.filter((t) => t.type === 'blob' && typeof t.path === 'string' && !SKIP.test(t.path)).map((t) => t.path) : [];
   const files = paths.length;
   let tests = 0;
   const byExt = {};
@@ -99,7 +104,7 @@ export async function loadFacts(owner, repo, { fetchImpl = fetch, token } = {}) 
 
   const readmeText = readme || '';
   const headings = [...readmeText.matchAll(/^#{1,3}\s+(.{1,80})$/gm)].map((m) => m[1].trim()).slice(0, 18);
-  const langBytes = languages && typeof languages === 'object' ? Object.entries(languages).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, bytes]) => ({ name, bytes })) : [];
+  const langBytes = languages?.json && typeof languages.json === 'object' ? Object.entries(languages.json).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, bytes]) => ({ name, bytes })) : [];
 
   return {
     repo: `${owner}/${repo}`,
@@ -107,7 +112,7 @@ export async function loadFacts(owner, repo, { fetchImpl = fetch, token } = {}) 
     stars: Number.isFinite(meta.stargazers_count) ? meta.stargazers_count : null,
     topics: Array.isArray(meta.topics) ? meta.topics.slice(0, 8) : [],
     languages: langBytes,
-    treeTruncated: Boolean(tree?.truncated),
+    treeTruncated: Boolean(tree?.json?.truncated),
     counts: { files, tests, patches, generated, nativeDirs: [...native].slice(0, 8), filesByLanguage: Object.entries(byExt).sort((a, b) => b[1] - a[1]).slice(0, 6) },
     topLevel: Object.entries(top).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => ({ name, files: count })),
     workspaceCount: Object.keys(workspaces).length,

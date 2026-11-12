@@ -164,3 +164,27 @@ test('an unknown repo is a 404, not a tower', async () => {
     globalThis.fetch = real;
   }
 });
+
+test('a GitHub rate limit is not reported as a missing repo', async () => {
+  const real = globalThis.fetch;
+  globalThis.fetch = () => new Response('{"message":"API rate limit exceeded"}', { status: 403 });
+  try {
+    const res = await worker.fetch(new Request('https://g.example/o/r.svg?wait=1'), {});
+    expect(res.status).toBe(503);
+    expect(await res.text()).toContain('limiting requests');
+  } finally {
+    globalThis.fetch = real;
+  }
+});
+
+test('a daily cap of 0 never calls the model', async () => {
+  await withGithub(async () => {
+    let modelCalls = 0;
+    const kv = fakeKv();
+    const env = { KV: kv, DAILY_MODEL_CAP: '0', AI: { run: async () => { modelCalls++; return { response: MODEL_ANSWER }; } } };
+    const res = await worker.fetch(new Request('https://g.example/o/r.svg?wait=1'), env);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('x-gardener-source')).toBe('facts-only');
+    expect(modelCalls).toBe(0);
+  });
+});
