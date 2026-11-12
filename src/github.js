@@ -21,32 +21,73 @@ async function getRaw(fetchImpl, owner, repo, ref, path, limit = 200_000) {
   }
 }
 
+// GitHub's API rate-limits the shared IPs of Cloudflare Workers (HTTP 403). jsDelivr lists a repo's files (name and size, default branch with
+// @HEAD) with no such limit and no key, and raw.githubusercontent.com serves the files. What the API gave on top (stars, description, topics)
+// is missing then; everything else is the same.
+async function jsdelivrFiles(fetchImpl, owner, repo) {
+  try {
+    const r = await fetchImpl(`https://data.jsdelivr.com/v1/packages/gh/${owner}/${repo}@HEAD?structure=flat`, { headers: UA });
+    if (r.status === 404) return { status: 404 };
+    if (!r.ok) return { status: r.status };
+    const j = await r.json();
+    return Array.isArray(j.files) ? { files: j.files.filter((f) => typeof f.name === 'string').map((f) => ({ path: f.name.replace(/^\//, ''), size: Number(f.size) || 0 })) } : { status: 502 };
+  } catch {
+    return { status: 502 };
+  }
+}
+
 const EXT_LANG = { ts: 'TypeScript', tsx: 'TypeScript', js: 'JavaScript', jsx: 'JavaScript', mjs: 'JavaScript', py: 'Python', rs: 'Rust', go: 'Go', c: 'C', h: 'C', cc: 'C++', cpp: 'C++', java: 'Java', kt: 'Kotlin', swift: 'Swift', rb: 'Ruby', php: 'PHP', cs: 'C#', zig: 'Zig', star: 'Starlark', sh: 'Shell', md: 'Markdown', json: 'JSON', yml: 'YAML', yaml: 'YAML' };
 const TEST_FILE = /(\.|_)(test|spec)\.[a-z]+$|(^|\/)(tests?|__tests__)\//i;
-const SKIP = /(^|\/)(node_modules|dist|build|vendor|\.git|\.next|coverage|target)\//;
+// Hidden folders (.repos, .github, .claude...) are tooling and vendored copies, not the product, and an alphabetical file list would spend its cap on them first.
+const SKIP = /(^|\/)(node_modules|dist|build|vendor|\.git|\.next|coverage|target)\/|^\.[^/]+\//;
 
 // Repo facts from GitHub: metadata, README, the file tree, the manifests. No model, no guessing: counts are counted.
 // fetchImpl is injectable for tests.
 export async function loadFacts(owner, repo, { fetchImpl = fetch, token } = {}) {
   const headers = { ...UA, accept: 'application/vnd.github+json', ...(token ? { authorization: `Bearer ${token}` } : {}) };
   const res = await getJson(fetchImpl, `https://api.github.com/repos/${owner}/${repo}`, headers);
-  if (!res.json) {
+  let meta;
+  let branch = 'HEAD';
+  let tree = null;
+  let languages = null;
+  let viaJsdelivr = false;
+  let sizes = null;
+  if (res.json) {
+    meta = res.json;
+    branch = typeof meta.default_branch === 'string' ? meta.default_branch : 'HEAD';
+  } else {
     if (res.status === 404) return { error: 'not-found', status: 404 };
-    return { error: res.status === 403 || res.status === 429 ? 'github-rate-limited' : 'github-error', status: 503 };
+    const alt = await jsdelivrFiles(fetchImpl, owner, repo);
+    if (alt.status === 404) return { error: 'not-found', status: 404 };
+    if (!alt.files) return { error: res.status === 403 || res.status === 429 ? 'github-rate-limited' : 'github-error', status: 503 };
+    viaJsdelivr = true;
+    meta = { description: '', stargazers_count: null, topics: [] };
+    tree = { json: { tree: alt.files.map((f) => ({ type: 'blob', path: f.path })), truncated: false } };
+    sizes = alt.files;
   }
-  const meta = res.json;
-  const branch = typeof meta.default_branch === 'string' ? meta.default_branch : 'HEAD';
 
-  const [tree, languages, readme, agents, rootPkg] = await Promise.all([
-    getJson(fetchImpl, `https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`, headers),
-    getJson(fetchImpl, `https://api.github.com/repos/${owner}/${repo}/languages`, headers),
+  const [apiTree, apiLanguages, readme, agents, rootPkg] = await Promise.all([
+    viaJsdelivr ? null : getJson(fetchImpl, `https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`, headers),
+    viaJsdelivr ? null : getJson(fetchImpl, `https://api.github.com/repos/${owner}/${repo}/languages`, headers),
     getRaw(fetchImpl, owner, repo, branch, 'README.md', 60_000),
     getRaw(fetchImpl, owner, repo, branch, 'AGENTS.md', 6_000).then((t) => t ?? getRaw(fetchImpl, owner, repo, branch, 'CLAUDE.md', 6_000)),
     getRaw(fetchImpl, owner, repo, branch, 'package.json'),
   ]);
+  if (!viaJsdelivr) {
+    tree = apiTree;
+    languages = apiLanguages;
+  } else {
+    // no languages endpoint: bytes per language from the file sizes
+    const bytes = {};
+    for (const f of sizes) {
+      const ext = f.path.includes('.') ? f.path.split('.').pop().toLowerCase() : '';
+      if (EXT_LANG[ext] && !/^(Markdown|JSON|YAML)$/.test(EXT_LANG[ext])) bytes[EXT_LANG[ext]] = (bytes[EXT_LANG[ext]] || 0) + f.size;
+    }
+    languages = { json: bytes };
+  }
 
-  const MAX_PATHS = 20_000;
-  const paths = Array.isArray(tree?.json?.tree) ? tree.json.tree.slice(0, 60_000).filter((t) => t.type === 'blob' && typeof t.path === 'string' && !SKIP.test(t.path)).map((t) => t.path).slice(0, MAX_PATHS) : [];
+  const MAX_PATHS = 30_000;
+  const paths = Array.isArray(tree?.json?.tree) ? tree.json.tree.filter((t) => t.type === 'blob' && typeof t.path === 'string' && !SKIP.test(t.path)).map((t) => t.path).slice(0, MAX_PATHS) : [];
   const files = paths.length;
   let tests = 0;
   const byExt = {};
@@ -113,6 +154,7 @@ export async function loadFacts(owner, repo, { fetchImpl = fetch, token } = {}) 
     stars: Number.isFinite(meta.stargazers_count) ? meta.stargazers_count : null,
     topics: Array.isArray(meta.topics) ? meta.topics.slice(0, 8) : [],
     languages: langBytes,
+    source: viaJsdelivr ? 'jsdelivr' : 'github',
     treeTruncated: Boolean(tree?.json?.truncated) || (tree?.json?.tree?.length || 0) > MAX_PATHS,
     counts: { files, tests, patches, generated, nativeDirs: [...native].slice(0, 8), filesByLanguage: Object.entries(byExt).sort((a, b) => b[1] - a[1]).slice(0, 6) },
     topLevel: Object.entries(top).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => ({ name, files: count })),

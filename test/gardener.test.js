@@ -1,7 +1,7 @@
 import { beforeEach, expect, test } from 'bun:test';
 import worker, { _clearMemory } from '../src/index.js';
 import { loadFacts } from '../src/github.js';
-import { parseTower, supported } from '../src/wolf.js';
+import { fallbackTower, parseTower, supported } from '../src/wolf.js';
 
 const FILES = {
   'README.md': '# Demo\n\nA shop with a database.\n',
@@ -222,6 +222,65 @@ test('past the daily growing cap nothing is fetched and the answer is cheap', as
 test('a huge tree is cut, so a request stays inside the free CPU limit', async () => {
   const big = Array.from({ length: 50_000 }, (_, i) => ({ type: 'blob', path: `apps/web/f${i}.ts` }));
   const f = await loadFacts('o', 'r', { fetchImpl: (u) => (String(u).includes('/git/trees/') ? new Response(JSON.stringify({ tree: big })) : fakeFetch(u)) });
-  expect(f.counts.files).toBe(20_000);
+  expect(f.counts.files).toBe(30_000);
   expect(f.treeTruncated).toBe(true);
+});
+
+// GitHub's API refuses (403), jsDelivr lists the files, raw serves the README and the manifests.
+function limitedGithub(url) {
+  const u = String(url);
+  if (u.startsWith('https://api.github.com/')) return new Response('{"message":"API rate limit exceeded"}', { status: 403 });
+  if (u.startsWith('https://data.jsdelivr.com/v1/packages/gh/o/r@HEAD')) {
+    return new Response(JSON.stringify({ files: [{ name: '/apps/web/a.ts', size: 9000 }, { name: '/apps/web/a.test.ts', size: 100 }, { name: '/patches/x.patch', size: 5 }, { name: '/native/gpu/m.rs', size: 400 }, { name: '/README.md', size: 50 }] }));
+  }
+  if (u.startsWith('https://data.jsdelivr.com/')) return new Response('{}', { status: 404 });
+  const raw = u.match(/raw\.githubusercontent\.com\/o\/r\/HEAD\/(.+)$/);
+  if (raw) return FILES[raw[1]] ? new Response(FILES[raw[1]]) : new Response('', { status: 404 });
+  return new Response('', { status: 404 });
+}
+
+test('when GitHub refuses, the file list comes from jsDelivr and the tower is still grown', async () => {
+  const facts = await loadFacts('o', 'r', { fetchImpl: limitedGithub });
+  expect(facts.source).toBe('jsdelivr');
+  expect(facts.counts.files).toBe(5);
+  expect(facts.counts.tests).toBe(1);
+  expect(facts.counts.patches).toBe(1);
+  expect(facts.counts.nativeDirs).toEqual(['gpu']);
+  expect(facts.languages.map((l) => l.name)).toEqual(['TypeScript', 'Rust']);
+  expect(facts.stars).toBeNull();
+  expect(facts.stack.packageManager).toBe('pnpm@9.1.0');
+  // jsDelivr cuts big repos' file lists, so the plain tower writes lower bounds
+  const t = fallbackTower(facts);
+  expect(t.foundation.text).toBe('5+ FILES');
+  expect(t.neck.title).toBe('1+ PATCHES');
+  expect(t.insets.find((i) => i.kind === 'tests').caption).toBe('1+ TEST FILES');
+
+  const real = globalThis.fetch;
+  globalThis.fetch = (url) => limitedGithub(url);
+  try {
+    const res = await worker.fetch(new Request('https://g.example/o/r.svg?wait=1'), {});
+    expect(res.status).toBe(200);
+    const json = await (await worker.fetch(new Request('https://g.example/o/r.json'), {})).json();
+    expect(json.note).toContain('jsDelivr');
+  } finally {
+    globalThis.fetch = real;
+  }
+});
+
+test('with GitHub refusing and jsDelivr saying 404 the repo does not exist', async () => {
+  const f = await loadFacts('o', 'nope', { fetchImpl: limitedGithub });
+  expect(f.error).toBe('not-found');
+});
+
+test('with GitHub and jsDelivr both failing it is a rate limit, not a missing repo', async () => {
+  const f = await loadFacts('o', 'r', { fetchImpl: () => new Response('', { status: 403 }) });
+  expect(f.error).toBe('github-rate-limited');
+});
+
+test('hidden folders do not use up the path cap, so apps/ and packages/ are still counted', async () => {
+  const tree = [...Array.from({ length: 35_000 }, (_, i) => ({ type: 'blob', path: `.repos/effect/f${i}.ts` })), ...Array.from({ length: 300 }, (_, i) => ({ type: 'blob', path: `apps/server/f${i}.ts` }))];
+  const f = await loadFacts('o', 'r', { fetchImpl: (u) => (String(u).includes('/git/trees/') ? new Response(JSON.stringify({ tree })) : fakeFetch(u)) });
+  expect(f.counts.files).toBe(300);
+  expect(f.workspaces).toEqual([{ name: 'apps/server', files: 300 }]);
+  expect(f.topLevel[0]).toEqual({ name: 'apps', files: 300 });
 });

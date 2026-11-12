@@ -113,6 +113,7 @@ export function buildMessages(facts) {
     '- braces.right: what the end user is doing, in a few words, as a joke ("SOMEONE BUYING SOCKS"). It is never "YOU ARE HERE". zoom: a hopeful line and a dry aside ("it shipped?!" / "(on my machine)").',
     '- crane: the AI agents, only if the README or AGENTS file talks about agents.',
     'Rules:',
+    '- If FACTS has "source":"jsdelivr", every count is a lower bound (the file list is cut for big repos): write counts as "N+" and never as an exact number.',
     '- The two examples above are about other repos. Never copy its wording: every label must be about THIS repo, and the jokes must fit it.',
     '- Use ONLY facts from FACTS. Every number, version and name you write must appear in FACTS. If a fact is missing, leave that field out instead of inventing it.',
     '- ALL CAPS, except package names, file paths and versions, which keep their spelling.',
@@ -258,6 +259,8 @@ const num = (n) => Number(n).toLocaleString('en-US');
 
 // What the tower says when the model is absent or wrong: plain facts, no jokes, nothing invented.
 export function fallbackTower(facts) {
+  // jsDelivr truncates the file list of big repos (948 of about 32,000 files for one), so its counts are lower bounds: write them as N+.
+  const plus = facts.source === 'jsdelivr' ? '+' : '';
   const name = facts.repo.split('/')[1];
   const ws = facts.workspaces || [];
   const langs = facts.counts.filesByLanguage || [];
@@ -265,18 +268,18 @@ export function fallbackTower(facts) {
   const dep = Object.keys(ver)[0];
   const node = facts.stack?.engines?.node;
   const insets = [];
-  if (facts.counts.tests > 0) insets.push({ kind: 'tests', caption: `${num(facts.counts.tests)} TEST FILES` });
-  if (facts.counts.patches > 0) insets.push({ kind: 'tape', caption: `${num(facts.counts.patches)} PATCH FILES` });
+  if (facts.counts.tests > 0) insets.push({ kind: 'tests', caption: `${num(facts.counts.tests)}${plus} TEST FILES` });
+  if (facts.counts.patches > 0) insets.push({ kind: 'tape', caption: `${num(facts.counts.patches)}${plus} PATCH FILES` });
   if ((facts.counts.nativeDirs || []).length > 0) insets.push({ kind: 'rocket', caption: `NATIVE: ${facts.counts.nativeDirs.slice(0, 2).join(', ')}`.slice(0, 30) });
   return {
     title: up(name).slice(0, 24),
-    foundation: { stones: langs.slice(0, 4).map(([n]) => up(n).slice(0, 12)), text: `${num(facts.counts.files)} FILES` },
+    foundation: { stones: langs.slice(0, 4).map(([n]) => up(n).slice(0, 12)), text: `${num(facts.counts.files)}${plus} FILES` },
     runtime: { bar: node ? `NODE ${node}` : '', tool: facts.stack?.packageManager ? String(facts.stack.packageManager).replace('@', ' ') : '', toolNote: '' },
     core: { title: dep ? up(dep).slice(0, 16) : '', note: dep && ver[dep] ? String(ver[dep]) : '', disc: '' },
-    middle: { title: facts.workspaceCount ? `${facts.workspaceCount} WORKSPACES` : '', note: (facts.workspaceGroups || []).slice(0, 3).map((g) => `${g.count} ${up(g.name)}`).join(' + ').slice(0, 46) },
-    left: { title: ws[0] ? ws[0].name.slice(0, 16) : '', stat: ws[0] ? `${num(ws[0].files)} FILES` : '', note: '' },
-    right: { title: ws[1] ? ws[1].name.slice(0, 16) : '', stat: ws[1] ? `${num(ws[1].files)} FILES` : '', note: '' },
-    neck: { title: facts.counts.patches > 0 ? `${facts.counts.patches} PATCHES` : '', note: facts.counts.patches > 0 ? 'patches/' : '' },
+    middle: { title: facts.workspaceCount ? `${facts.workspaceCount}${plus} WORKSPACES` : '', note: (facts.workspaceGroups || []).slice(0, 3).map((g) => `${g.count} ${up(g.name)}`).join(' + ').slice(0, 46) },
+    left: { title: ws[0] ? ws[0].name.slice(0, 16) : '', stat: ws[0] ? `${num(ws[0].files)}${plus} FILES` : '', note: '' },
+    right: { title: ws[1] ? ws[1].name.slice(0, 16) : '', stat: ws[1] ? `${num(ws[1].files)}${plus} FILES` : '', note: '' },
+    neck: { title: facts.counts.patches > 0 ? `${facts.counts.patches}${plus} PATCHES` : '', note: facts.counts.patches > 0 ? 'patches/' : '' },
     upper: { pentagon: ['', ''], pentagonNote: '', triangle: '', plank: '' },
     red: { title: ver.electron ? `ELECTRON ${ver.electron}` : '', note: '' },
     crane: { title: '', note: '' },
