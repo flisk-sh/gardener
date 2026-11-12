@@ -188,3 +188,40 @@ test('a daily cap of 0 never calls the model', async () => {
     expect(modelCalls).toBe(0);
   });
 });
+
+test('crawlers get the home page and nothing else', async () => {
+  const robots = await (await worker.fetch(new Request('https://g.example/robots.txt'), {})).text();
+  expect(robots).toContain('Allow: /$');
+  expect(robots).toContain('Disallow: /\n');
+  const page = await (await worker.fetch(new Request('https://g.example/o/r'), {})).text();
+  expect(page).toContain('noindex,nofollow');
+  expect(await (await worker.fetch(new Request('https://g.example/'), {})).text()).not.toContain('noindex');
+});
+
+test('when KV fails (free-tier limit) the site still answers', async () => {
+  await withGithub(async () => {
+    const broken = { get: async () => { throw new Error('KV get() limit exceeded'); }, put: async () => { throw new Error('KV put() limit exceeded'); } };
+    const res = await worker.fetch(new Request('https://g.example/o/r.svg?wait=1'), { KV: broken });
+    expect(res.status).toBe(200);
+    const bg = await worker.fetch(new Request('https://g.example/o/r2.svg'), { KV: broken }, { waitUntil() {} });
+    expect(bg.status).toBe(200);
+  });
+});
+
+test('past the daily growing cap nothing is fetched and the answer is cheap', async () => {
+  await withGithub(async () => {
+    const kv = fakeKv();
+    kv.m.set(`gen:${new Date().toISOString().slice(0, 10)}`, '100');
+    const res = await worker.fetch(new Request('https://g.example/o/r.svg?wait=1'), { KV: kv });
+    expect(res.status).toBe(503);
+    expect(await res.text()).toContain('try again tomorrow');
+    expect(githubCalls).toBe(0);
+  });
+});
+
+test('a huge tree is cut, so a request stays inside the free CPU limit', async () => {
+  const big = Array.from({ length: 50_000 }, (_, i) => ({ type: 'blob', path: `apps/web/f${i}.ts` }));
+  const f = await loadFacts('o', 'r', { fetchImpl: (u) => (String(u).includes('/git/trees/') ? new Response(JSON.stringify({ tree: big })) : fakeFetch(u)) });
+  expect(f.counts.files).toBe(20_000);
+  expect(f.treeTruncated).toBe(true);
+});

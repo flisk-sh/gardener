@@ -45,7 +45,8 @@ export async function loadFacts(owner, repo, { fetchImpl = fetch, token } = {}) 
     getRaw(fetchImpl, owner, repo, branch, 'package.json'),
   ]);
 
-  const paths = Array.isArray(tree?.json?.tree) ? tree.json.tree.filter((t) => t.type === 'blob' && typeof t.path === 'string' && !SKIP.test(t.path)).map((t) => t.path) : [];
+  const MAX_PATHS = 20_000;
+  const paths = Array.isArray(tree?.json?.tree) ? tree.json.tree.slice(0, 60_000).filter((t) => t.type === 'blob' && typeof t.path === 'string' && !SKIP.test(t.path)).map((t) => t.path).slice(0, MAX_PATHS) : [];
   const files = paths.length;
   let tests = 0;
   const byExt = {};
@@ -112,7 +113,7 @@ export async function loadFacts(owner, repo, { fetchImpl = fetch, token } = {}) 
     stars: Number.isFinite(meta.stargazers_count) ? meta.stargazers_count : null,
     topics: Array.isArray(meta.topics) ? meta.topics.slice(0, 8) : [],
     languages: langBytes,
-    treeTruncated: Boolean(tree?.json?.truncated),
+    treeTruncated: Boolean(tree?.json?.truncated) || (tree?.json?.tree?.length || 0) > MAX_PATHS,
     counts: { files, tests, patches, generated, nativeDirs: [...native].slice(0, 8), filesByLanguage: Object.entries(byExt).sort((a, b) => b[1] - a[1]).slice(0, 6) },
     topLevel: Object.entries(top).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => ({ name, files: count })),
     workspaceCount: Object.keys(workspaces).length,

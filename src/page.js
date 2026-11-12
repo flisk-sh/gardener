@@ -58,7 +58,7 @@ function layout({ title, origin, body, path = '/' }) {
 <meta name="description" content="${esc(DESC)}">
 <link rel="canonical" href="${esc(origin + path)}">
 <meta name="theme-color" content="#07080c">
-<meta name="color-scheme" content="light dark">
+<meta name="color-scheme" content="light dark">${path !== '/' ? '<meta name="robots" content="noindex,nofollow">' : ''}
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <meta property="og:type" content="website"><meta property="og:site_name" content="Gardener"><meta property="og:title" content="${t}"><meta property="og:description" content="${esc(DESC)}"><meta property="og:url" content="${esc(origin + path)}">
 <style>${CSS}</style><script src="https://flisk.si/assets/bar.js" defer></script></head><body>

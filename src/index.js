@@ -35,15 +35,35 @@ export async function buildTower(owner, repo, env = {}, { fetchImpl = fetch } = 
   return { facts, tower, source, filled, dropped: tower.dropped || [], note };
 }
 
+// KV on the free plan stops at 1,000 writes a day. When it does, the site keeps working: no cache, no counters, no background growth.
+const safe = async (fn, fallback = null) => {
+  try {
+    return await fn();
+  } catch {
+    return fallback;
+  }
+};
+
 // ---- limits: the model is the expensive part, so it is capped per day and per visitor. Over a cap the tower is still drawn, from facts only.
 async function allowModel(env, ip) {
   if (!env.KV) return true;
   const now = new Date().toISOString();
   const dailyKey = `cap:${now.slice(0, 10)}`;
   const ipKey = `ip:${ip}:${now.slice(0, 13)}`;
-  const [d, i] = await Promise.all([env.KV.get(dailyKey), env.KV.get(ipKey)]);
-  if (Number(d || 0) >= Number(env.DAILY_MODEL_CAP || 200) || Number(i || 0) >= Number(env.IP_HOURLY || 6)) return false;
-  await Promise.all([env.KV.put(dailyKey, String(Number(d || 0) + 1), { expirationTtl: 172800 }), env.KV.put(ipKey, String(Number(i || 0) + 1), { expirationTtl: 7200 })]);
+  const [d, i] = await Promise.all([safe(() => env.KV.get(dailyKey)), safe(() => env.KV.get(ipKey))]);
+  if (Number(d || 0) >= Number(env.DAILY_MODEL_CAP ?? 200) || Number(i || 0) >= Number(env.IP_HOURLY ?? 6)) return false;
+  await Promise.all([safe(() => env.KV.put(dailyKey, String(Number(d || 0) + 1), { expirationTtl: 172800 })), safe(() => env.KV.put(ipKey, String(Number(i || 0) + 1), { expirationTtl: 7200 }))]);
+  return true;
+}
+
+// Growing a tower costs GitHub calls and CPU even without the model, and one flood must not use up the account's 100,000 requests a day
+// (every Worker on the account stops with it). So growing itself has a daily cap too; over it the answer is cheap.
+async function allowGrow(env) {
+  if (!env.KV) return true;
+  const key = `gen:${new Date().toISOString().slice(0, 10)}`;
+  const n = Number((await safe(() => env.KV.get(key))) || 0);
+  if (n >= Number(env.GENERATE_DAILY_CAP ?? 100)) return false;
+  await safe(() => env.KV.put(key, String(n + 1), { expirationTtl: 172800 }));
   return true;
 }
 
@@ -51,17 +71,18 @@ async function allowModel(env, ip) {
 const memory = new Map();
 const cacheKey = (repo) => `tower:${VERSION}:${repo.toLowerCase()}`;
 async function getEntry(env, repo) {
-  if (env.KV) return env.KV.get(cacheKey(repo), { type: 'json' });
+  if (env.KV) return safe(() => env.KV.get(cacheKey(repo), { type: 'json' }));
   return memory.get(cacheKey(repo)) || null;
 }
 async function putEntry(env, repo, entry) {
   const ttl = entry.source.startsWith('wolf') ? TTL_WOLF : TTL_PLAIN;
-  if (env.KV) await env.KV.put(cacheKey(repo), JSON.stringify(entry), { expirationTtl: ttl });
+  if (env.KV) await safe(() => env.KV.put(cacheKey(repo), JSON.stringify(entry), { expirationTtl: ttl }));
   else memory.set(cacheKey(repo), entry);
 }
 export const _clearMemory = () => memory.clear();
 
 export async function grow(owner, repo, env, { ip = 'unknown', fetchImpl = fetch } = {}) {
+  if (!(await allowGrow(env))) return { error: 'resting', status: 503 };
   const useModel = await allowModel(env, ip);
   const built = await buildTower(owner, repo, useModel ? env : { GITHUB_TOKEN: env.GITHUB_TOKEN }, { fetchImpl });
   if (built.error) return built;
@@ -85,7 +106,9 @@ const svgResponse = (entry) => new Response(entry.svg, { headers: { ...SVG, 'cac
 const text = (body, status = 200) => new Response(body, { status, headers: { 'content-type': 'text/plain; charset=utf-8' } });
 const html = (body, status = 200) => new Response(body, { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 
-export const ROBOTS = 'User-agent: *\nAllow: /\nDisallow: /render\nDisallow: /check\n\nSitemap: https://gardener.flisk.si/sitemap.xml\n';
+// Every /<owner>/<repo> is a valid URL, so the space is endless: crawlers get the home page only (the same lesson as tools.flisk.si, where GPTBot
+// followed endless filter links and used up the account's Workers Free limit).
+export const ROBOTS = 'User-agent: *\nAllow: /$\nDisallow: /\n\nSitemap: https://gardener.flisk.si/sitemap.xml\n';
 export const SITEMAP = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://gardener.flisk.si/</loc></url></urlset>\n';
 
 export default {
@@ -140,14 +163,14 @@ export default {
     const wait = url.searchParams.get('wait') === '1' || !env.KV;
     if (!wait) {
       const pendingKey = `pending:${VERSION}:${full.toLowerCase()}`;
-      if (!(await env.KV.get(pendingKey))) {
-        await env.KV.put(pendingKey, '1', { expirationTtl: 120 });
+      if (!(await safe(() => env.KV.get(pendingKey)))) {
+        await safe(() => env.KV.put(pendingKey, '1', { expirationTtl: 120 }));
         ctx.waitUntil(grow(owner, repo, env, { ip }).catch(() => {}));
       }
       return new Response(placeholder(full), { headers: { ...SVG, 'cache-control': 'public, max-age=20' } });
     }
     const grown = await grow(owner, repo, env, { ip });
-    if (grown.error) return text({ 'not-found': 'repo not found', 'github-rate-limited': 'GitHub is limiting requests from this server right now: try again in a few minutes' }[grown.error] || 'GitHub error', grown.status || 502);
+    if (grown.error) return text({ 'not-found': 'repo not found', 'github-rate-limited': 'GitHub is limiting requests from this server right now: try again in a few minutes', resting: 'Gardener has grown all the towers it can today (free-tier limits): try again tomorrow' }[grown.error] || 'GitHub error', grown.status || 502);
     return svgResponse(grown.entry);
   },
 };
