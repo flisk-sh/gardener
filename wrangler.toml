@@ -1,0 +1,25 @@
+name = "gardener"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# gardener.flisk.si on the flisk.si zone (same Cloudflare account as diagram.flisk.si).
+routes = [{ pattern = "gardener.flisk.si", custom_domain = true }]
+
+# Wolf runs on Workers AI: Qwen2.5-Coder 32B, the model flisk-wolf is made from.
+[ai]
+binding = "AI"
+
+# Finished towers, the daily and per-visitor model counters, and the "growing" marker.
+# Create it once: `bunx wrangler@4 kv namespace create GARDENER`, then put the printed id here.
+[[kv_namespaces]]
+binding = "KV"
+id = "REPLACE_WITH_THE_ID_FROM_kv_namespace_create"
+
+[vars]
+PUBLIC_ORIGIN = "https://gardener.flisk.si"
+DAILY_MODEL_CAP = "200"   # model calls a day, all visitors; over it a tower is drawn from facts only
+IP_HOURLY = "6"           # model calls an hour, one visitor
+
+# Optional secrets:
+#   bunx wrangler@4 secret put GITHUB_TOKEN   raises the GitHub API limit (60 an hour without it)
+#   bunx wrangler@4 secret put WOLF_KEY       call the hosted flisk-wolf (inference.flisk.si) instead of the AI binding above

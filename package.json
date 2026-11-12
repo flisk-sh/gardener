@@ -1,0 +1,10 @@
+{
+  "name": "gardener",
+  "private": true,
+  "type": "module",
+  "description": "Turn a GitHub repo into a hand-drawn 'Dependency' tower meme. Facts come from the repo, the labels from Wolf (flisk-wolf), the drawing from code.",
+  "scripts": {
+    "test": "bun test",
+    "make": "bun scripts/make.mjs"
+  }
+}
