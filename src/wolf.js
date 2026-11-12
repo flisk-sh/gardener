@@ -190,8 +190,11 @@ export function parseTower(text, facts, { grounded = true } = {}) {
   if (!obj || typeof obj !== 'object') return null;
   const factsText = JSON.stringify(facts).replace(/,(?=\d{3})/g, '');
   const dropped = [];
+  const approx = facts?.source === 'jsdelivr';
   const g = (value, max, path) => {
-    const s = str(value, max);
+    let s = str(value, max);
+    // jsDelivr cuts big repos' file lists, so a count is a lower bound whatever the model wrote
+    if (approx && s) s = s.replace(/(\d[\d,]*)(?![\d,]*\+)(\s+(?:TEST\s+|PATCH\s+|GENERATED\s+)?(?:FILES|WORKSPACES|PATCHES|DIRS|DIRECTORIES))/gi, '$1+$2');
     if (s && /^(braces|oss|cloud\.label|badge|insets)/.test(path) && EXAMPLE_STRINGS.has(squash(s)) && !squash(factsText).includes(squash(s))) {
       dropped.push(`${path} (copied from the example)`);
       return '';
@@ -243,12 +246,27 @@ export function parseTower(text, facts, { grounded = true } = {}) {
     seen.add(kind);
     t.insets.push({ kind, caption });
   }
+  const ranged = [...(facts?.stack?.rootDependencies || []), ...Object.entries(facts?.stack?.workspaceVersions || {}).map(([n, v]) => `${n}@${v}`)]
+    .map((d) => /^(.+?)@([\^~].*)$/.exec(d))
+    .filter(Boolean)
+    .map((m) => m[1].toLowerCase());
+  for (const [obj, title, note] of [[t.neck, t.neck.title, 'note'], [t.red, t.red.title, 'note']]) {
+    if (/pin/i.test(obj[note]) && ranged.some((n) => title.toLowerCase().includes(n))) {
+      obj[note] = '';
+      dropped.push(`${note === 'note' ? (obj === t.neck ? 'neck' : 'red') : ''}.note (the repo gives it a ^ or ~ range, not a pin)`);
+    }
+  }
   for (const [obj, name, note] of [[t.red, 'red.title', 'note'], [t.runtime, 'runtime.tool', 'toolNote']]) {
     const label = name === 'red.title' ? obj.title : obj.tool;
     if (/pin/i.test(obj[note]) && /[\^~]/.test(label)) {
       obj[note] = '';
       dropped.push(`${name.split('.')[0]}.${note} (a ^ or ~ range is not a pin)`);
     }
+  }
+  // the same thing twice (the fragile neck and the red pinned label) reads as a glitch
+  if (t.red.title && t.red.title === t.neck.title) {
+    t.red = { title: '', note: '' };
+    dropped.push('red (the same as the neck)');
   }
   t.dropped = dropped;
   return t;
@@ -257,36 +275,47 @@ export function parseTower(text, facts, { grounded = true } = {}) {
 const up = (s) => String(s).toUpperCase();
 const num = (n) => Number(n).toLocaleString('en-US');
 
-// What the tower says when the model is absent or wrong: plain facts, no jokes, nothing invented.
+// What the tower says when the model is absent or wrong: plain facts, no invented jokes. It has to stand on its own, because it is also what a
+// visitor gets once the model's free daily allowance is used up.
 export function fallbackTower(facts) {
   // jsDelivr truncates the file list of big repos (948 of about 32,000 files for one), so its counts are lower bounds: write them as N+.
   const plus = facts.source === 'jsdelivr' ? '+' : '';
   const name = facts.repo.split('/')[1];
-  const ws = facts.workspaces || [];
   const langs = facts.counts.filesByLanguage || [];
   const ver = facts.stack?.workspaceVersions || {};
-  const dep = Object.keys(ver)[0];
+  const rootDeps = (facts.stack?.rootDependencies || []).map((d) => d.replace(/@[^@]*$/, '')).filter((d) => d && !d.startsWith('@types/') && !/^(typescript|vitest|biome|@biomejs\/biome|knip|esbuild)$/.test(d));
+  const deps = [...Object.keys(ver), ...rootDeps];
   const node = facts.stack?.engines?.node;
+  // apps/* and packages/* when the repo has them, else its biggest top-level folders
+  const parts = (facts.workspaces || []).length >= 2 ? facts.workspaces : (facts.topLevel || []).filter((t) => t.name !== '(root)').map((t) => ({ name: `${t.name}/`, files: t.files }));
+  const pm = facts.stack?.packageManager ? String(facts.stack.packageManager).replace('@', ' ') : facts.stack?.lockfile || '';
+  const core = deps[0];
+  const small = [...parts].sort((a, b) => a.files - b.files)[0];
+  const rule = /\b(never|do not|don't)\b[^.\n]{6,70}/i.exec(facts.agentsFile || '')?.[0];
   const insets = [];
   if (facts.counts.tests > 0) insets.push({ kind: 'tests', caption: `${num(facts.counts.tests)}${plus} TEST FILES` });
   if (facts.counts.patches > 0) insets.push({ kind: 'tape', caption: `${num(facts.counts.patches)}${plus} PATCH FILES` });
   if ((facts.counts.nativeDirs || []).length > 0) insets.push({ kind: 'rocket', caption: `NATIVE: ${facts.counts.nativeDirs.slice(0, 2).join(', ')}`.slice(0, 30) });
+  if ((facts.counts.nativeDirs || []).length > 0) insets.push({ kind: 'ghost', caption: `${facts.counts.nativeDirs[0]} (NATIVE)`.slice(0, 30) });
+  if (facts.counts.generated > 0) insets.push({ kind: 'scroll', caption: `${num(facts.counts.generated)}${plus} GENERATED FILES` });
+  if (rule) insets.push({ kind: 'nosign', caption: clip(up(rule), 30) });
+  if (small && parts.length > 2) insets.push({ kind: 'tiny', caption: `${small.name} (${num(small.files)}${plus} FILES)`.slice(0, 30) });
   return {
     title: up(name).slice(0, 24),
     foundation: { stones: langs.slice(0, 4).map(([n]) => up(n).slice(0, 12)), text: `${num(facts.counts.files)}${plus} FILES` },
-    runtime: { bar: node ? `NODE ${node}` : '', tool: facts.stack?.packageManager ? String(facts.stack.packageManager).replace('@', ' ') : '', toolNote: '' },
-    core: { title: dep ? up(dep).slice(0, 16) : '', note: dep && ver[dep] ? String(ver[dep]) : '', disc: '' },
-    middle: { title: facts.workspaceCount ? `${facts.workspaceCount}${plus} WORKSPACES` : '', note: (facts.workspaceGroups || []).slice(0, 3).map((g) => `${g.count} ${up(g.name)}`).join(' + ').slice(0, 46) },
-    left: { title: ws[0] ? ws[0].name.slice(0, 16) : '', stat: ws[0] ? `${num(ws[0].files)}${plus} FILES` : '', note: '' },
-    right: { title: ws[1] ? ws[1].name.slice(0, 16) : '', stat: ws[1] ? `${num(ws[1].files)}${plus} FILES` : '', note: '' },
+    runtime: { bar: node ? `NODE ${node}` : '', tool: pm, toolNote: facts.stack?.lockfile && !facts.stack?.packageManager ? 'LOCKFILE' : '' },
+    core: { title: core ? up(core).slice(0, 16) : '', note: core && ver[core] ? String(ver[core]) : '', disc: deps[1] ? deps[1].slice(0, 26) : '' },
+    middle: { title: facts.workspaceCount ? `${facts.workspaceCount}${plus} WORKSPACES` : parts.length ? `${parts.length} TOP-LEVEL DIRS` : '', note: facts.workspaceCount ? (facts.workspaceGroups || []).slice(0, 3).map((g) => `${g.count} ${up(g.name)}`).join(' + ').slice(0, 46) : parts.slice(0, 5).map((x) => x.name).join(', ').slice(0, 46) },
+    left: { title: parts[0] ? parts[0].name.slice(0, 16) : '', stat: parts[0] ? `${num(parts[0].files)}${plus} FILES` : '', note: '' },
+    right: { title: parts[1] ? parts[1].name.slice(0, 16) : '', stat: parts[1] ? `${num(parts[1].files)}${plus} FILES` : '', note: '' },
     neck: { title: facts.counts.patches > 0 ? `${facts.counts.patches}${plus} PATCHES` : '', note: facts.counts.patches > 0 ? 'patches/' : '' },
-    upper: { pentagon: ['', ''], pentagonNote: '', triangle: '', plank: '' },
+    upper: { pentagon: [deps[2] ? up(deps[2]).slice(0, 8) : '', ''], pentagonNote: '', triangle: deps[3] ? up(deps[3]).slice(0, 12) : '', plank: facts.stack?.scripts?.length && pm ? `${pm.split(' ')[0]} run ${facts.stack.scripts.find((x) => /^(dev|start)$/.test(x)) || facts.stack.scripts[0]}`.slice(0, 22) : '' },
     red: { title: ver.electron ? `ELECTRON ${ver.electron}` : '', note: '' },
-    crane: { title: '', note: '' },
-    oss: '',
+    crane: facts.agentsFile ? { title: 'AI AGENTS', note: 'AGENTS.md IS IN THE REPO' } : { title: '', note: '' },
+    oss: core ? `THE MAINTAINERS OF ${up(core)}`.slice(0, 48) : '',
     cloud: { word: '', label: '' },
-    badge: '',
-    braces: { left: `ALL OF ${up(name)}`.slice(0, 22), right: '' },
+    badge: facts.stars != null ? `${num(facts.stars)} STARS` : '',
+    braces: { left: `ALL OF ${up(name)}`.slice(0, 22), right: facts.readme?.firstCommand ? `SOMEONE TYPING ${facts.readme.firstCommand}`.slice(0, 40) : '' },
     zoom: { say: 'it works?!', aside: '(on my machine)' },
     insets,
     dropped: [],

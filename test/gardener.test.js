@@ -2,6 +2,7 @@ import { beforeEach, expect, test } from 'bun:test';
 import worker, { _clearMemory } from '../src/index.js';
 import { loadFacts } from '../src/github.js';
 import { fallbackTower, parseTower, supported } from '../src/wolf.js';
+import { renderTower } from '../src/tower.js';
 
 const FILES = {
   'README.md': '# Demo\n\nA shop with a database.\n',
@@ -283,4 +284,50 @@ test('hidden folders do not use up the path cap, so apps/ and packages/ are stil
   expect(f.counts.files).toBe(300);
   expect(f.workspaces).toEqual([{ name: 'apps/server', files: 300 }]);
   expect(f.topLevel[0]).toEqual({ name: 'apps', files: 300 });
+});
+
+test('the plain tower stands on its own for a repo without apps/ and packages/', () => {
+  const facts = {
+    repo: 'o/cli', source: 'jsdelivr', stars: null, agentsFile: 'Never edit generated files by hand. Run the tests.',
+    counts: { files: 300, tests: 40, patches: 0, generated: 4, nativeDirs: [], filesByLanguage: [['TypeScript', 200], ['Markdown', 60]] },
+    workspaces: [], workspaceCount: 0, workspaceGroups: [],
+    topLevel: [{ name: 'docs', files: 120 }, { name: 'cli', files: 100 }, { name: 'tests', files: 40 }, { name: '(root)', files: 5 }],
+    stack: { packageManager: null, engines: { node: '>=22' }, rootDependencies: ['commander@^15', 'chalk@^6', 'react@^19', 'ink@^8', 'typescript@5'], workspaceVersions: {}, scripts: ['build', 'dev'], lockfile: 'bun' },
+    readme: { headings: [], firstCommand: 'npx o/cli demo', excerpt: '' },
+  };
+  const t = fallbackTower(facts);
+  expect(t.left).toMatchObject({ title: 'docs/', stat: '120+ FILES' });
+  expect(t.right).toMatchObject({ title: 'cli/', stat: '100+ FILES' });
+  expect(t.middle.title).toBe('3 TOP-LEVEL DIRS');
+  expect(t.core.title).toBe('COMMANDER');
+  expect(t.runtime).toMatchObject({ bar: 'NODE >=22', tool: 'bun', toolNote: 'LOCKFILE' });
+  expect(t.upper.plank).toBe('bun run dev');
+  expect(t.crane.title).toBe('AI AGENTS');
+  expect(t.braces.right).toBe('SOMEONE TYPING npx o/cli demo');
+  expect(t.insets.map((i) => i.kind)).toEqual(['tests', 'scroll', 'nosign', 'tiny']);
+  expect(t.insets.find((i) => i.kind === 'nosign').caption).toContain('NEVER EDIT GENERATED');
+  expect(renderTower(t)).toContain('docs/');
+});
+
+test('from jsDelivr every count the model wrote becomes a lower bound', () => {
+  const facts = { source: 'jsdelivr', counts: { files: 517, tests: 536, generated: 7 }, stack: { rootDependencies: ['commander@^15.0.0'], workspaceVersions: {} }, workspaces: [{ name: 'cli', files: 517 }] };
+  const t = parseTower(JSON.stringify({ left: { title: 'cli', stat: '517 FILES' }, insets: [{ kind: 'tests', caption: '536 TEST FILES' }], middle: { title: '5 WORKSPACES' } }), { ...facts, counts: { ...facts.counts, tests: 536 } });
+  expect(t.left.stat).toBe('517+ FILES');
+  expect(t.insets[0].caption).toBe('536+ TEST FILES');
+  const exact = parseTower(JSON.stringify({ left: { title: 'cli', stat: '517 FILES' } }), { ...facts, source: 'github' });
+  expect(exact.left.stat).toBe('517 FILES');
+});
+
+test('a dependency the repo ranges with ^ is never called pinned', () => {
+  const facts = { source: 'github', counts: { files: 5 }, stack: { rootDependencies: ['commander@^15.0.0'], workspaceVersions: {} } };
+  const t = parseTower(JSON.stringify({ neck: { title: 'COMMANDER 15.0.0', note: 'PINNED FOR CLI' }, red: { title: 'COMMANDER 15.0.0', note: 'PINNED' } }), facts);
+  expect(t.neck.note).toBe('');
+  expect(t.red.note).toBe('');
+  expect(t.dropped.join('|')).toContain('not a pin');
+});
+
+test('the neck and the red label are never the same words', () => {
+  const t = parseTower(JSON.stringify({ neck: { title: '33 PATCHES' }, red: { title: '33 PATCHES' } }), { counts: { patches: 33 } });
+  expect(t.neck.title).toBe('33 PATCHES');
+  expect(t.red.title).toBe('');
 });

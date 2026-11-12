@@ -182,7 +182,6 @@ export function renderTower(tower, { seed = tower.title || 'tower' } = {}) {
   cluster(430, 700, 1050, 1250, 0.45);
   box(425, 1245, 285, 9, '#fff', 2, 0.6);
   box(330, 1124, 150, 22, '#fff', 2.2, 2, -18);
-  text(405, 1140, t.upper?.plank, 13, { rot: -18, maxWidth: 140 });
   box(740, 1280, 200, 120, '#f4f4f4', 2.8, 2.5);
   text(840, 1326, t.right?.title, 26, { maxWidth: 180 });
   text(840, 1352, t.right?.stat, 18, { maxWidth: 180 });
@@ -239,7 +238,7 @@ export function renderTower(tower, { seed = tower.title || 'tower' } = {}) {
   add(`<path d="M420,300 q-50,0 -52,40 l-4,230 q-2,40 -50,50 q48,10 50,50 l4,230 q2,40 52,40" fill="none" stroke="${INK}" stroke-width="3.4"/>`);
   text(215, 640, lines(t.braces?.left, 12), 36, { rot: -78, maxWidth: 420 });
   add(`<path d="M880,330 q50,0 55,40 l6,200 q4,30 46,38 q-42,8 -46,38 l-6,200 q-5,40 -55,40" fill="none" stroke="${INK}" stroke-width="3.4" transform="translate(30,0) scale(1,0.92)"/>`);
-  text(1040, 440, lines(t.braces?.right, 16), 26, { anchor: 'start', maxWidth: 400 });
+  text(1040, 440, lines(t.braces?.right, 22), 24, { anchor: 'start', maxWidth: 420 });
 
   // ---- insets
   const FRAMES = [{ x: 1060, y: 985, w: 220, h: 100 }, { x: 35, y: 1110, w: 270, h: 170 }, { x: 1100, y: 580, w: 190, h: 110 }, { x: 1090, y: 1230, w: 200, h: 150 }, { x: 40, y: 150, w: 230, h: 80 }, { x: 20, y: 1768, w: 290, h: 90 }];

@@ -145,6 +145,11 @@ export async function loadFacts(owner, repo, { fetchImpl = fetch, token } = {}) 
   }
 
   const readmeText = readme || '';
+  // The first shell command in a fenced block: what a user types first.
+  const fence = readmeText.match(/```(?:bash|sh|shell|console)?\n([\s\S]*?)```/);
+  const firstCommand = (fence?.[1] || '').split('\n').map((l) => l.trim().replace(/^\$\s*/, '')).find((l) => l && !l.startsWith('#')) || '';
+  const LOCKS = { 'bun.lock': 'bun', 'bun.lockb': 'bun', 'pnpm-lock.yaml': 'pnpm', 'package-lock.json': 'npm', 'yarn.lock': 'yarn', 'Cargo.lock': 'cargo', 'go.sum': 'go', 'poetry.lock': 'poetry', 'uv.lock': 'uv' };
+  const lockfile = paths.map((x) => LOCKS[x]).find(Boolean) || null;
   const headings = [...readmeText.matchAll(/^#{1,3}\s+(.{1,80})$/gm)].map((m) => m[1].trim()).slice(0, 18);
   const langBytes = languages?.json && typeof languages.json === 'object' ? Object.entries(languages.json).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, bytes]) => ({ name, bytes })) : [];
 
@@ -166,8 +171,10 @@ export async function loadFacts(owner, repo, { fetchImpl = fetch, token } = {}) 
       engines: pkg?.engines || null,
       rootDependencies: deps,
       workspaceVersions: wsDeps,
+      scripts: pkg?.scripts ? Object.keys(pkg.scripts).slice(0, 8) : [],
+      lockfile,
     },
-    readme: { headings, excerpt: readmeText.slice(0, 1800).replace(/\s+/g, ' ').trim() },
+    readme: { headings, firstCommand: firstCommand.slice(0, 80), excerpt: readmeText.slice(0, 1800).replace(/\s+/g, ' ').trim() },
     agentsFile: agents ? agents.slice(0, 1500).replace(/\s+/g, ' ').trim() : null,
   };
 }

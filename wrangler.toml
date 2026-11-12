@@ -17,10 +17,10 @@ id = "376bd5ae20d24e9eb2b3cb2baa68fe98"
 
 [vars]
 PUBLIC_ORIGIN = "https://gardener.flisk.si"
-DAILY_MODEL_CAP = "0"     # model calls a day, all visitors. 0 = the model is never called: every tower is drawn from facts only, at no cost.
-                          # Workers AI is free only up to a small daily allowance (about 10,000 neurons, a few towers); raise this only on purpose.
+DAILY_MODEL_CAP = "10"    # model calls a day, all visitors. One tower costs about 450 neurons; the account is on Workers Free, whose allowance is
+                          # 10,000 neurons a day shared with inference.flisk.si and the docs Ask, and which stops at the limit instead of billing.
 GENERATE_DAILY_CAP = "100" # towers grown a day, with or without the model: protects GitHub, the CPU limit and the account-wide 100,000 requests a day
-IP_HOURLY = "6"           # model calls an hour, one visitor
+IP_HOURLY = "3"           # model calls an hour, one visitor
 
 # Optional secrets:
 #   bunx wrangler@4 secret put GITHUB_TOKEN   raises the GitHub API limit (60 an hour without it)

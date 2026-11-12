@@ -6,7 +6,7 @@ import { ICON, page, resultPage } from './page.js';
 import SAMPLE from './sample.js';
 
 // Bump when the prompt or the drawing changes: it is part of the cache key, so old towers are not served for a week.
-export const VERSION = 'v3';
+export const VERSION = 'v5';
 const SVG = { 'content-type': 'image/svg+xml; charset=utf-8', 'access-control-allow-origin': '*' };
 const TTL_WOLF = 7 * 86400;
 const TTL_PLAIN = 3600;
@@ -92,7 +92,7 @@ export async function grow(owner, repo, env, { ip = 'unknown', fetchImpl = fetch
     source: built.source,
     filled: built.filled,
     dropped: built.dropped,
-    note: [useModel ? built.note : 'the model is off for now: plain facts only', built.facts.source === 'jsdelivr' ? 'file list via jsDelivr (GitHub limits this server): no stars or description' : ''].filter(Boolean).join(' · '),
+    note: [useModel ? built.note : 'the model has no free allowance left for now', built.facts.source === 'jsdelivr' ? 'file list via jsDelivr (GitHub limits this server): no stars or description' : ''].filter(Boolean).join(' · '),
     tower: built.tower,
     at: new Date().toISOString(),
   };

@@ -64,7 +64,7 @@ function layout({ title, origin, body, path = '/' }) {
 <style>${CSS}</style><script src="https://flisk.si/assets/bar.js" defer></script></head><body>
 <header class="top stage"><nav class="wrap" aria-label="Site"><a href="/"><img src="/icon.svg" alt="" width="26" height="26">Gardener</a><a href="https://flisk.sh">Flisk</a></nav></header>
 ${body}
-<footer><div class="wrap">Gardener: labels by the Wolf model (flisk-wolf), numbers counted from the repo, nothing stored but the finished tower. <a href="https://github.com/flisk-sh/gardener">Open source</a>, made by <a href="https://flisk.sh">Flisk</a>.</div></footer>
+<footer><div class="wrap">Gardener: every number is counted from the repo. The Wolf model (flisk-wolf) writes the labels while its free daily allowance lasts, and plain facts fill in after that. Nothing is stored but the finished tower. <a href="https://github.com/flisk-sh/gardener">Open source</a>, made by <a href="https://flisk.sh">Flisk</a>.</div></footer>
 </body></html>`;
 }
 
@@ -113,7 +113,7 @@ export function resultPage(origin, repo) {
 const s=${JSON.stringify(snippet).replace(/</g, '\\u003c')},repo=${JSON.stringify(repo).replace(/</g, '\\u003c')},c=document.getElementById('copy'),img=document.getElementById('img');
 c.onclick=()=>navigator.clipboard.writeText(s).then(()=>{c.textContent='Copied';setTimeout(()=>c.textContent='Copy README snippet',1500)});
 img.onload=()=>{document.getElementById('grow').hidden=true;img.hidden=false;document.getElementById('lede').textContent='Your tower is ready. Copy the snippet to the top of the README.';
-fetch('/'+repo+'.json').then(r=>r.ok?r.json():null).then(j=>{if(!j)return;const m=document.getElementById('meta');m.hidden=false;m.textContent='Labels by '+j.source+' · '+j.filled+' fields from the model · '+j.dropped.length+' dropped because the repo does not back them'+(j.note?' · '+j.note:'');document.getElementById('json').hidden=false}).catch(()=>{})};
+fetch('/'+repo+'.json').then(r=>r.ok?r.json():null).then(j=>{if(!j)return;const m=document.getElementById('meta');m.hidden=false;m.textContent=(j.source==='facts-only'?'Plain facts: counted from the repo, no model words':'Labels by '+j.source+' · '+j.filled+' fields from the model · '+j.dropped.length+' dropped because the repo does not back them')+(j.note?' · '+j.note:'');document.getElementById('json').hidden=false}).catch(()=>{})};
 img.onerror=()=>{document.getElementById('err').hidden=false;document.getElementById('grow').hidden=true;document.getElementById('lede').hidden=true};
 img.src='/'+repo+'.svg?wait=1';
 </script>`,
