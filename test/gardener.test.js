@@ -434,3 +434,20 @@ test('the agent file rules and the README first line are collected as facts', as
   expect(f.agentsRules).toEqual(['Never edit generated files by hand.', 'Do not commit .env files.']);
   expect(f.readme.firstLine).toBe('T is a small tool that grows towers from repos.');
 });
+
+test('Go, Rust and Python manifests give a runtime and direct dependencies', async () => {
+  const { otherEcosystem } = await import('../src/github.js');
+  const go = otherEcosystem({ goMod: 'module x\n\ngo 1.23.4\n\nrequire (\n\tgithub.com/go-chi/chi/v5 v5.0.8\n\tgithub.com/x/y v1.0.0 // indirect\n)\n' });
+  expect(go).toEqual({ deps: ['chi@v5.0.8'], runtime: 'GO 1.23.4' });
+  const rs = otherEcosystem({ cargo: '[package]\nrust-version = "1.75"\n[dependencies]\ntokio = { version = "1.3", features = ["full"] }\nserde = "1"\n' });
+  expect(rs.runtime).toBe('RUST 1.75');
+  expect(rs.deps).toEqual(['tokio@1.3', 'serde@1']);
+  const py = otherEcosystem({ requirements: 'fastapi>=0.100\n# c\nuvicorn\n' });
+  expect(py.deps).toEqual(['fastapi@>=0.100', 'uvicorn@any']);
+});
+
+test('the tower sways, unless motion is reduced', () => {
+  const svg = renderTower(fallbackTower({ repo: 'o/r', counts: { files: 3 } , stack: {}, readme: {} }));
+  expect(svg).toContain('class="sway"');
+  expect(svg).toContain('prefers-reduced-motion');
+});

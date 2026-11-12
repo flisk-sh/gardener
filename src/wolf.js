@@ -315,7 +315,7 @@ export function fallbackTower(facts) {
   // the library the repo is about: not tooling, not the owner's own packages, unscoped names first
   const own = (n) => n.toLowerCase().startsWith(`@${owner.toLowerCase()}/`) || n.toLowerCase().startsWith(owner.toLowerCase()) || n.toLowerCase().startsWith(name.toLowerCase());
   const libs = entries.filter((e) => !tooling.test(e.name) && !own(e.name));
-  const KNOWN = ['electron', 'next', 'nuxt', 'astro', 'remix', 'svelte', 'vue', 'react', 'express', 'fastify', 'hono', 'koa', '@nestjs/core', 'prisma', 'drizzle-orm', 'effect', 'crawlee', 'playwright', 'puppeteer', 'ink', 'commander', 'tailwindcss', 'vite', 'zod', 'axios'];
+  const KNOWN = ['gin', 'echo', 'fiber', 'chi', 'cobra', 'gorm', 'pgx', 'grpc', 'tokio', 'axum', 'serde', 'django', 'flask', 'fastapi', 'pydantic', 'electron', 'next', 'nuxt', 'astro', 'remix', 'svelte', 'vue', 'react', 'express', 'fastify', 'hono', 'koa', '@nestjs/core', 'prisma', 'drizzle-orm', 'effect', 'crawlee', 'playwright', 'puppeteer', 'ink', 'commander', 'tailwindcss', 'vite', 'zod', 'axios'];
   const rank = (e) => (KNOWN.includes(e.name) ? KNOWN.indexOf(e.name) : KNOWN.length + (e.name.startsWith('@') ? 1 : 0));
   const seen = new Set();
   const deps = [...libs].sort((a, b) => rank(a) - rank(b)).filter((e) => !seen.has(e.name) && seen.add(e.name));
@@ -345,7 +345,7 @@ export function fallbackTower(facts) {
   return {
     title: up(name).slice(0, 24),
     foundation: { stones: langs.slice(0, 4).map(([n]) => up(n).slice(0, 12)), text: count(facts.counts.files, 'FILE') },
-    runtime: { bar: node ? `NODE ${node}` : '', tool: pm, toolNote: facts.stack?.packageManager ? 'PINNED' : facts.stack?.lockfile ? 'LOCKFILE' : '' },
+    runtime: { bar: node ? `NODE ${node}` : (facts.stack?.runtime || ''), tool: pm, toolNote: facts.stack?.packageManager ? 'PINNED' : facts.stack?.lockfile ? 'LOCKFILE' : '' },
     core: { title: core ? up(core.name).slice(0, 16) : '', note: core ? `${core.version}${exact(core) ? ' (EXACT PIN)' : ''}`.trim().slice(0, 30) : '', disc: deps[1] ? deps[1].name.slice(0, 26) : '' },
     middle: { title: facts.workspaceCount ? `${facts.workspaceCount}${plus} WORKSPACES` : parts.length ? `${parts.length} TOP-LEVEL DIRS` : '', note: facts.workspaceCount ? (facts.workspaceGroups || []).slice(0, 3).map((g) => `${g.count} ${up(g.name)}`).join(' + ').slice(0, 46) : parts.slice(0, 5).map((x) => x.name).join(', ').slice(0, 46) },
     left: { title: parts[0] ? parts[0].name.slice(0, 16) : '', stat: parts[0] ? count(parts[0].files, 'FILE') : '', note: parts[0] ? share(parts[0].files) : '' },

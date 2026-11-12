@@ -12,6 +12,36 @@ async function getJson(fetchImpl, url, headers) {
   return r.ok ? { json: await r.json() } : { status: r.status };
 }
 
+// Go, Rust and Python repos have no package.json: read their manifests for a runtime version and the direct dependencies.
+// Names are the short form people say ("chi", not "github.com/go-chi/chi/v5").
+export function otherEcosystem({ goMod, cargo, pyproject, requirements }) {
+  const deps = [];
+  let runtime = '';
+  if (goMod) {
+    const v = /^go\s+(\d[\d.]*)/m.exec(goMod)?.[1];
+    if (v) runtime = `GO ${v}`;
+    for (const m of goMod.matchAll(/^\s*(?:require\s+)?([\w.-]+\.[\w.-]+\/[^\s]+)\s+(v[\w.+-]+)(?!.*\/\/ indirect)/gm)) {
+      const parts = m[1].split('/').filter((x) => !/^v\d+$/.test(x));
+      deps.push(`${parts[parts.length - 1]}@${m[2].slice(0, 24)}`);
+    }
+  } else if (cargo) {
+    const v = /^rust-version\s*=\s*"([^"]+)"/m.exec(cargo)?.[1] || /^edition\s*=\s*"(\d+)"/m.exec(cargo)?.[1];
+    if (v) runtime = /^\d{4}$/.test(v) ? `RUST ${v} EDITION` : `RUST ${v}`;
+    const block = /\[dependencies\]([\s\S]*?)(?:\n\[|$)/.exec(cargo)?.[1] || '';
+    for (const m of block.matchAll(/^([\w-]+)\s*=\s*(?:"([^"]+)"|\{[^}]*version\s*=\s*"([^"]+)")/gm)) deps.push(`${m[1]}@${(m[2] || m[3]).slice(0, 24)}`);
+  } else if (pyproject || requirements) {
+    const v = /requires-python\s*=\s*"([^"]+)"/.exec(pyproject || '')?.[1];
+    if (v) runtime = `PYTHON ${v}`;
+    const list = /^dependencies\s*=\s*\[([\s\S]*?)\]/m.exec(pyproject || '')?.[1] || '';
+    for (const m of list.matchAll(/"([A-Za-z0-9_.-]+)\s*([<>=!~][^"]*)?"/g)) deps.push(`${m[1]}@${(m[2] || '').replace(/\s+/g, '').slice(0, 24) || 'any'}`);
+    for (const l of (requirements || '').split('\n')) {
+      const m = /^([A-Za-z0-9_.-]+)\s*([<>=!~]=?[^\s;#]*)?/.exec(l.trim());
+      if (m && !l.startsWith('-') && !l.startsWith('#')) deps.push(`${m[1]}@${m[2] || 'any'}`);
+    }
+  }
+  return { deps: [...new Set(deps)].slice(0, 30), runtime };
+}
+
 async function getRaw(fetchImpl, owner, repo, ref, path, limit = 200_000) {
   try {
     const r = await fetchImpl(`https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${path}`, { headers: UA });
@@ -95,12 +125,16 @@ export async function loadFacts(owner, repo, { fetchImpl = fetch, token } = {}) 
     viaJsdelivr = true;
   }
 
-  const [apiTree, apiLanguages, readme, agents, rootPkg] = await Promise.all([
+  const [apiTree, apiLanguages, readme, agents, rootPkg, goMod, cargo, pyproject, requirements] = await Promise.all([
     viaJsdelivr ? null : getJson(fetchImpl, `https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`, headers),
     viaJsdelivr ? null : getJson(fetchImpl, `https://api.github.com/repos/${owner}/${repo}/languages`, headers),
     getRaw(fetchImpl, owner, repo, branch, 'README.md', 60_000),
     getRaw(fetchImpl, owner, repo, branch, 'AGENTS.md', 12_000).then((t) => t ?? getRaw(fetchImpl, owner, repo, branch, 'CLAUDE.md', 12_000)),
     getRaw(fetchImpl, owner, repo, branch, 'package.json'),
+    getRaw(fetchImpl, owner, repo, branch, 'go.mod', 60_000),
+    getRaw(fetchImpl, owner, repo, branch, 'Cargo.toml', 60_000),
+    getRaw(fetchImpl, owner, repo, branch, 'pyproject.toml', 60_000),
+    getRaw(fetchImpl, owner, repo, branch, 'requirements.txt', 20_000),
   ]);
   if (!viaJsdelivr) {
     tree = apiTree;
@@ -162,7 +196,9 @@ export async function loadFacts(owner, repo, { fetchImpl = fetch, token } = {}) 
   } catch {
     pkg = null;
   }
-  const deps = pkg ? Object.entries({ ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) }).slice(0, 30).map(([n, v]) => `${n}@${String(v).slice(0, 24)}`) : [];
+  const jsDeps = pkg ? Object.entries({ ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) }).slice(0, 30).map(([n, v]) => `${n}@${String(v).slice(0, 24)}`) : [];
+  const other = otherEcosystem({ goMod, cargo, pyproject, requirements });
+  const deps = jsDeps.length ? jsDeps : other.deps;
 
   // The workspaces' own manifests carry the versions that matter (Electron, Expo, React Native...).
   const wsNames = Object.entries(workspaces).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k]) => k);
@@ -215,6 +251,7 @@ export async function loadFacts(owner, repo, { fetchImpl = fetch, token } = {}) 
     stack: {
       packageManager: pkg?.packageManager || null,
       engines: pkg?.engines || null,
+      runtime: other.runtime,
       rootDependencies: deps,
       workspaceVersions: wsDeps,
       scripts: pkg?.scripts ? Object.keys(pkg.scripts).slice(0, 8) : [],

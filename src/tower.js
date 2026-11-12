@@ -115,8 +115,8 @@ export function renderTower(tower, { seed = tower.title || 'tower' } = {}) {
   const lines = (s, n) => wrap(s || '', n);
 
   add(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(`Dependency tower of ${t.title || 'a repo'}`)}">`);
-  add('<defs><filter id="wob" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="2" seed="4" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="3.2"/></filter></defs>');
-  add(`<rect width="${W}" height="${H}" fill="#fff"/><g filter="url(#wob)">`);
+  add('<defs><style>.sway{transform-origin:610px 1900px;animation:sway 9s ease-in-out infinite alternate}@keyframes sway{0%{transform:rotate(-1.6deg)}45%{transform:rotate(.4deg)}100%{transform:rotate(1.6deg)}}@media (prefers-reduced-motion:reduce){.sway{animation:none}}</style><filter id="wob" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="2" seed="4" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="3.2"/></filter></defs>');
+  add(`<rect width="${W}" height="${H}" fill="#fff"/><g class="sway"><g filter="url(#wob)">`);
 
   // ---- foundations
   [330, 540, 770, 970].forEach((x, i) => {
@@ -298,7 +298,7 @@ export function renderTower(tower, { seed = tower.title || 'tower' } = {}) {
       text(f.x + f.w / 2, f.y + f.h + 26, cap, 19, { maxWidth: f.w + 80 });
     }
   }
-  add('</g>');
+  add('</g></g>');
   text(1440, 36, t.title, 16, { anchor: 'end', fill: '#777', maxWidth: 300 });
   if (shark) {
     add(`<rect x="1040" y="1690" width="400" height="210" fill="#bfe3ec" stroke="${INK}" stroke-width="3"/><path d="M1040,1760 q40,-10 80,0 t80,0 t80,0 t80,0 t80,0" fill="none" stroke="#fff" stroke-width="3" opacity=".8"/><path d="M1110,1830 q80,-50 170,-20 q40,-30 70,-40 q-6,30 -20,40 q30,10 40,30 q-40,-6 -60,-4 q-70,40 -180,10 q-20,-10 -20,-16 z" fill="#8a99a4" stroke="${INK}" stroke-width="2.6"/><polygon points="1230,1815 1250,1775 1268,1812" fill="#8a99a4" stroke="${INK}" stroke-width="2.4"/><circle cx="1148" cy="1826" r="3.2" fill="#222"/>`);
