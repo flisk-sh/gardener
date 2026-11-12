@@ -93,7 +93,7 @@ ${error ? `<p class="error" role="alert">${esc(error)}</p>` : ''}${form(value)}
   });
 }
 
-export function resultPage(origin, repo) {
+export function resultPage(origin, repo, version = '') {
   const u = `${origin}/${repo}.svg`;
   const snippet = `<p align="center"><img src="${u}" alt="Dependency tower of ${repo}" width="100%"></p>`;
   return layout({
@@ -110,12 +110,12 @@ export function resultPage(origin, repo) {
 <pre id="snip">${esc(snippet)}</pre>
 </div></section></main>
 <script>
-const s=${JSON.stringify(snippet).replace(/</g, '\\u003c')},repo=${JSON.stringify(repo).replace(/</g, '\\u003c')},c=document.getElementById('copy'),img=document.getElementById('img');
+const s=${JSON.stringify(snippet).replace(/</g, '\\u003c')},version=${JSON.stringify(String(version)).replace(/</g, '\\u003c')},repo=${JSON.stringify(repo).replace(/</g, '\\u003c')},c=document.getElementById('copy'),img=document.getElementById('img');
 c.onclick=()=>navigator.clipboard.writeText(s).then(()=>{c.textContent='Copied';setTimeout(()=>c.textContent='Copy README snippet',1500)});
 img.onload=()=>{document.getElementById('grow').hidden=true;img.hidden=false;document.getElementById('lede').textContent='Your tower is ready. Copy the snippet to the top of the README.';
 fetch('/'+repo+'.json').then(r=>r.ok?r.json():null).then(j=>{if(!j)return;const m=document.getElementById('meta');m.hidden=false;m.textContent=(j.source==='facts-only'?'Plain facts: counted from the repo, no model words':'Labels by '+j.source+' · '+j.filled+' fields from the model · '+j.dropped.length+' dropped because the repo does not back them')+(j.note?' · '+j.note:'');document.getElementById('json').hidden=false}).catch(()=>{})};
 img.onerror=()=>{document.getElementById('err').hidden=false;document.getElementById('grow').hidden=true;document.getElementById('lede').hidden=true};
-img.src='/'+repo+'.svg?wait=1';
+img.src='/'+repo+'.svg?wait=1&v='+version;
 </script>`,
   });
 }

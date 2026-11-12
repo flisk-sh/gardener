@@ -331,3 +331,16 @@ test('the neck and the red label are never the same words', () => {
   expect(t.neck.title).toBe('33 PATCHES');
   expect(t.red.title).toBe('');
 });
+
+test('a plain-facts tower is cached for minutes, a model-written one for a day, and the page asks with the version', async () => {
+  await withGithub(async () => {
+    const plain = await worker.fetch(new Request('https://g.example/o/r.svg?wait=1'), {});
+    expect(plain.headers.get('cache-control')).toContain('max-age=300');
+    _clearMemory();
+    const model = await worker.fetch(new Request('https://g.example/o/r.svg?wait=1'), { AI: { run: async () => ({ response: MODEL_ANSWER }) } });
+    expect(model.headers.get('cache-control')).toContain('s-maxage=86400');
+    const page = await (await worker.fetch(new Request('https://g.example/o/r'), {})).text();
+    expect(page).toMatch(/\.svg\?wait=1&v='\+version/);
+    expect(page).toContain('version="v');
+  });
+});

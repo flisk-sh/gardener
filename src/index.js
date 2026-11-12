@@ -102,7 +102,9 @@ export async function grow(owner, repo, env, { ip = 'unknown', fetchImpl = fetch
 
 const placeholder = (repo) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 260" width="900" height="260" role="img" aria-label="Gardener is growing the tower of ${repo.replace(/[^\w./-]/g, '')}"><rect width="900" height="260" fill="#fbfaf7"/><g font-family="Chalkboard SE, Marker Felt, Comic Sans MS, sans-serif" text-anchor="middle" fill="#222"><text x="450" y="110" font-size="34">Gardener is growing this tower</text><text x="450" y="160" font-size="22">${repo.replace(/[^\w./-]/g, '')}</text><text x="450" y="205" font-size="18" fill="#66635c">reload in about a minute</text></g></svg>`;
 
-const svgResponse = (entry) => new Response(entry.svg, { headers: { ...SVG, 'cache-control': 'public, max-age=3600, s-maxage=86400', 'x-gardener-source': entry.source, 'x-gardener-fields-from-model': String(entry.filled) } });
+// A tower the model wrote is kept for a day. A plain-facts one is replaced by a better one as soon as the model has allowance again, so browsers and
+// image proxies must not keep it for long (an hour of max-age is why a visitor kept seeing the blank tower after a better one existed).
+const svgResponse = (entry) => new Response(entry.svg, { headers: { ...SVG, 'cache-control': entry.source.startsWith('wolf') ? 'public, max-age=3600, s-maxage=86400' : 'public, max-age=300, s-maxage=300', 'x-gardener-source': entry.source, 'x-gardener-fields-from-model': String(entry.filled) } });
 const text = (body, status = 200) => new Response(body, { status, headers: { 'content-type': 'text/plain; charset=utf-8' } });
 const html = (body, status = 200) => new Response(body, { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 
@@ -146,7 +148,7 @@ export default {
     if (!validRepo(owner, repo)) return text('not a GitHub repo name', 400);
     const full = `${owner}/${repo}`;
 
-    if (!ext) return html(resultPage(origin, full));
+    if (!ext) return html(resultPage(origin, full, VERSION));
 
     if (ext === 'json') {
       const entry = await getEntry(env, full);
