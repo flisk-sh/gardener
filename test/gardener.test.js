@@ -446,7 +446,7 @@ test('Go, Rust and Python manifests give a runtime and direct dependencies', asy
   expect(py.deps).toEqual(['fastapi@>=0.100', 'uvicorn@any']);
 });
 
-test('the tower sways, unless motion is reduced', () => {
+test('the tower sways, more gently when motion is reduced', () => {
   const svg = renderTower(fallbackTower({ repo: 'o/r', counts: { files: 3 } , stack: {}, readme: {} }));
   expect(svg).toContain('class="sway"');
   expect(svg).toContain('prefers-reduced-motion');

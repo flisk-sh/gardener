@@ -115,7 +115,7 @@ export function renderTower(tower, { seed = tower.title || 'tower' } = {}) {
   const lines = (s, n) => wrap(s || '', n);
 
   add(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(`Dependency tower of ${t.title || 'a repo'}`)}">`);
-  add('<defs><style>.sway{transform-origin:610px 1900px;animation:sway 9s ease-in-out infinite alternate}@keyframes sway{0%{transform:rotate(-1.6deg)}45%{transform:rotate(.4deg)}100%{transform:rotate(1.6deg)}}@media (prefers-reduced-motion:reduce){.sway{animation:none}}</style><filter id="wob" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="2" seed="4" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="3.2"/></filter></defs>');
+  add('<defs><style>.sway{transform-origin:610px 1900px;animation:sway 9s ease-in-out infinite alternate}@keyframes sway{0%{transform:rotate(-1.6deg)}45%{transform:rotate(.4deg)}100%{transform:rotate(1.6deg)}}@media (prefers-reduced-motion:reduce){.sway{animation-name:sway-soft;animation-duration:24s}}@keyframes sway-soft{0%{transform:rotate(-.8deg)}100%{transform:rotate(.8deg)}}</style><filter id="wob" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="2" seed="4" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="3.2"/></filter></defs>');
   add(`<rect width="${W}" height="${H}" fill="#fff"/><g class="sway"><g filter="url(#wob)">`);
 
   // ---- foundations
