@@ -333,6 +333,9 @@ export function fallbackTower(facts) {
   const script = ['dev', 'start', 'build', 'test'].find((x) => scripts.includes(x)) || scripts[0];
   const talksAboutAgents = Boolean(facts.agentsFile) || /\b(AI agents?|MCP|Claude|LLMs?|Copilot|Codex)\b/i.test(`${facts.description || ''} ${facts.readme?.excerpt || ''}`);
   const hint = (facts.hints || [])[0];
+  const kf = facts.keyFiles || [];
+  const base = (p) => p.split('/').pop().replace(/\.[^.]+$/, '');
+  const kb = (n) => `${Math.max(1, Math.round(n / 1024))} KB`;
   const insets = [];
   if (facts.counts.tests > 0) insets.push({ kind: 'tests', caption: count(facts.counts.tests, 'TEST FILE') });
   if (facts.counts.patches >= 3) insets.push({ kind: 'tape', caption: count(facts.counts.patches, 'PATCH FILE') });
@@ -344,15 +347,15 @@ export function fallbackTower(facts) {
   const HINT_WORD = { 'GITHUB ACTIONS': 'ci', DOCKER: 'docker', 'CLOUDFLARE WORKERS': 'workers', VERCEL: 'vercel', NETLIFY: 'netlify', 'FLY.IO': 'fly', RENDER: 'render', TERRAFORM: 'cloud', KUBERNETES: 'k8s' };
   return {
     title: up(name).slice(0, 24),
-    foundation: { stones: langs.slice(0, 4).map(([n]) => up(n).slice(0, 12)), text: count(facts.counts.files, 'FILE') },
+    foundation: { stones: [...langs.slice(0, 4).map(([n]) => up(n).slice(0, 12)), ...(hint ? [up(hint.split(' ')[0]).slice(0, 12)] : []), ...(facts.agentsFile ? ['AGENTS.MD'] : [])].filter((x, i, a) => a.indexOf(x) === i).slice(0, 4), text: count(facts.counts.files, 'FILE') },
     runtime: { bar: node ? `NODE ${node}` : (facts.stack?.runtime || ''), tool: pm, toolNote: facts.stack?.packageManager ? 'PINNED' : facts.stack?.lockfile ? 'LOCKFILE' : '' },
     core: !core && facts.stack?.noDependencies ? { title: 'NOTHING', note: 'ZERO DEPENDENCIES', disc: '' } : { title: core ? up(core.name).slice(0, 16) : '', note: core ? `${core.version}${exact(core) ? ' (EXACT PIN)' : ''}`.trim().slice(0, 30) : '', disc: deps[1] ? deps[1].name.slice(0, 26) : '' },
     middle: { title: facts.workspaceCount ? `${facts.workspaceCount}${plus} WORKSPACES` : parts.length ? `${parts.length} TOP-LEVEL DIRS` : '', note: facts.workspaceCount ? (facts.workspaceGroups || []).slice(0, 3).map((g) => `${g.count} ${up(g.name)}`).join(' + ').slice(0, 46) : parts.slice(0, 5).map((x) => x.name).join(', ').slice(0, 46) },
     left: { title: parts[0] ? parts[0].name.slice(0, 16) : '', stat: parts[0] ? count(parts[0].files, 'FILE') : '', note: parts[0] ? share(parts[0].files) : '' },
     right: { title: parts[1] ? parts[1].name.slice(0, 16) : '', stat: parts[1] ? count(parts[1].files, 'FILE') : '', note: parts[1] ? share(parts[1].files) : '' },
-    neck: facts.counts.patches > 0 ? { title: count(facts.counts.patches, 'PATCH', 'PATCHES'), note: 'patches/' } : facts.counts.generated > 0 ? { title: count(facts.counts.generated, 'GENERATED FILE'), note: 'WRITTEN BY A TOOL' } : { title: '', note: '' },
-    upper: { pentagon: [deps[2] ? up(deps[2].name).slice(0, 10) : '', ''], pentagonNote: deps[2]?.version ? deps[2].version.slice(0, 14) : '', triangle: deps[3] ? up(deps[3].name).slice(0, 12) : '', plank: script && pm ? `${pm.split(' ')[0]} run ${script}`.slice(0, 22) : '' },
-    red: ver.electron ? { title: `ELECTRON ${ver.electron}`, note: exact({ version: ver.electron }) ? 'EXACT PIN' : '' } : pinned ? { title: `${up(pinned.name)} ${pinned.version}`.slice(0, 20), note: 'EXACT PIN' } : { title: '', note: '' },
+    neck: facts.counts.patches > 0 ? { title: count(facts.counts.patches, 'PATCH', 'PATCHES'), note: 'patches/' } : facts.counts.generated > 0 ? { title: count(facts.counts.generated, 'GENERATED FILE'), note: 'WRITTEN BY A TOOL' } : kf[0] ? { title: `${base(kf[0].path)}${kf[0].path.match(/\.[^.]+$/)?.[0] || ''}`.slice(0, 18), note: `THE BIGGEST FILE, ${kb(kf[0].bytes)}` } : { title: '', note: '' },
+    upper: { pentagon: [deps[2] ? up(deps[2].name).slice(0, 10) : (kf[1] ? up(base(kf[1].path)).slice(0, 10) : ''), ''], pentagonNote: deps[2]?.version ? deps[2].version.slice(0, 14) : (!deps[2] && kf[1] ? kb(kf[1].bytes) : ''), triangle: deps[3] ? up(deps[3].name).slice(0, 12) : (kf[2] ? up(base(kf[2].path)).slice(0, 12) : ''), plank: script && pm ? `${pm.split(' ')[0]} run ${script}`.slice(0, 22) : '' },
+    red: ver.electron ? { title: `ELECTRON ${ver.electron}`, note: exact({ version: ver.electron }) ? 'EXACT PIN' : '' } : pinned ? { title: `${up(pinned.name)} ${pinned.version}`.slice(0, 20), note: 'EXACT PIN' } : facts.stack?.noDependencies && !facts.stack?.lockfile ? { title: 'NO LOCKFILE', note: 'NOTHING TO LOCK' } : { title: '', note: '' },
     crane: talksAboutAgents ? { title: 'AI AGENTS', note: facts.agentsFile ? 'AGENTS.md IS IN THE REPO' : 'THE README MENTIONS THEM' } : { title: '', note: '' },
     oss: core ? `THE MAINTAINERS OF ${up(core.name)}`.slice(0, 48) : '',
     cloud: hint ? { word: HINT_WORD[hint] || 'cloud', label: `${hint} (IN THE REPO)`.slice(0, 44) } : { word: '', label: '' },

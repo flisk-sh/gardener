@@ -153,6 +153,13 @@ export async function loadFacts(owner, repo, { fetchImpl = fetch, token } = {}) 
   const MAX_PATHS = 30_000;
   const paths = Array.isArray(tree?.json?.tree) ? tree.json.tree.filter((t) => t.type === 'blob' && typeof t.path === 'string' && !SKIP.test(t.path)).map((t) => t.path).slice(0, MAX_PATHS) : [];
   const files = paths.length;
+  // the biggest source files: material for the labels when a repo has few dependencies
+  const sizeOf = new Map([...(sizes || []).map((f) => [f.path, f.size]), ...((tree?.json?.tree || []).map((t) => [t.path, t.size]))].filter(([, v]) => Number.isFinite(v) && v > 0));
+  const keyFiles = paths
+    .filter((x) => /\.(m?[jt]sx?|py|go|rs|rb|java|kt|swift|c|cc|cpp|cs|php|lua|ex|zig)$/i.test(x) && !/(^|\/)(tests?|__tests__|spec|vendor|node_modules)\//i.test(x) && !/\.(test|spec)\./i.test(x) && sizeOf.has(x))
+    .sort((a, b) => sizeOf.get(b) - sizeOf.get(a))
+    .slice(0, 5)
+    .map((x) => ({ path: x, bytes: sizeOf.get(x) }));
   let tests = 0;
   const byExt = {};
   const top = {};
@@ -248,6 +255,7 @@ export async function loadFacts(owner, repo, { fetchImpl = fetch, token } = {}) 
     hints: [...hints],
     treeTruncated: Boolean(tree?.json?.truncated) || (tree?.json?.tree?.length || 0) > MAX_PATHS,
     counts: { files, tests, patches, generated, nativeDirs: [...native].slice(0, 8), filesByLanguage: Object.entries(byExt).sort((a, b) => b[1] - a[1]).slice(0, 6) },
+    keyFiles,
     topLevel: Object.entries(top).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => ({ name, files: count })),
     workspaceCount: Object.keys(workspaces).length,
     workspaceGroups: Object.entries(groups).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([name, count]) => ({ name, count })),
