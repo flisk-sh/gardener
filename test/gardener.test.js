@@ -451,3 +451,19 @@ test('the tower sways, more gently when motion is reduced', () => {
   expect(svg).toContain('class="sway"');
   expect(svg).toContain('prefers-reduced-motion');
 });
+
+test('a repo with a package.json and no dependencies says so, and a diagram is not the first command', async () => {
+  const f = await loadFacts('o', 'r', { fetchImpl: (u) => {
+    const x = String(u);
+    if (x.endsWith('/package.json')) return new Response('{"name":"x","scripts":{"test":"t"}}');
+    if (x.endsWith('/wrangler.toml')) return new Response('compatibility_date = "2026-11-01"\n');
+    if (x.endsWith('/README.md')) return new Response('# T\n\n```\nrepo --(code)--> facts --> tower\n```\n\n```bash\nnpm test\n```\n');
+    return fakeFetch(x);
+  } });
+  expect(f.stack.noDependencies).toBe(true);
+  expect(f.stack.runtime).toBe('WORKERS 2026-11-01');
+  expect(f.readme.firstCommand).toBe('npm test');
+  const t = fallbackTower(f);
+  expect(t.core.title).toBe('NOTHING');
+  expect(t.runtime.bar).toBe('WORKERS 2026-11-01');
+});

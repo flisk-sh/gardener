@@ -346,7 +346,7 @@ export function fallbackTower(facts) {
     title: up(name).slice(0, 24),
     foundation: { stones: langs.slice(0, 4).map(([n]) => up(n).slice(0, 12)), text: count(facts.counts.files, 'FILE') },
     runtime: { bar: node ? `NODE ${node}` : (facts.stack?.runtime || ''), tool: pm, toolNote: facts.stack?.packageManager ? 'PINNED' : facts.stack?.lockfile ? 'LOCKFILE' : '' },
-    core: { title: core ? up(core.name).slice(0, 16) : '', note: core ? `${core.version}${exact(core) ? ' (EXACT PIN)' : ''}`.trim().slice(0, 30) : '', disc: deps[1] ? deps[1].name.slice(0, 26) : '' },
+    core: !core && facts.stack?.noDependencies ? { title: 'NOTHING', note: 'ZERO DEPENDENCIES', disc: '' } : { title: core ? up(core.name).slice(0, 16) : '', note: core ? `${core.version}${exact(core) ? ' (EXACT PIN)' : ''}`.trim().slice(0, 30) : '', disc: deps[1] ? deps[1].name.slice(0, 26) : '' },
     middle: { title: facts.workspaceCount ? `${facts.workspaceCount}${plus} WORKSPACES` : parts.length ? `${parts.length} TOP-LEVEL DIRS` : '', note: facts.workspaceCount ? (facts.workspaceGroups || []).slice(0, 3).map((g) => `${g.count} ${up(g.name)}`).join(' + ').slice(0, 46) : parts.slice(0, 5).map((x) => x.name).join(', ').slice(0, 46) },
     left: { title: parts[0] ? parts[0].name.slice(0, 16) : '', stat: parts[0] ? count(parts[0].files, 'FILE') : '', note: parts[0] ? share(parts[0].files) : '' },
     right: { title: parts[1] ? parts[1].name.slice(0, 16) : '', stat: parts[1] ? count(parts[1].files, 'FILE') : '', note: parts[1] ? share(parts[1].files) : '' },

@@ -125,7 +125,7 @@ export async function loadFacts(owner, repo, { fetchImpl = fetch, token } = {}) 
     viaJsdelivr = true;
   }
 
-  const [apiTree, apiLanguages, readme, agents, rootPkg, goMod, cargo, pyproject, requirements] = await Promise.all([
+  const [apiTree, apiLanguages, readme, agents, rootPkg, goMod, cargo, pyproject, requirements, wrangler] = await Promise.all([
     viaJsdelivr ? null : getJson(fetchImpl, `https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`, headers),
     viaJsdelivr ? null : getJson(fetchImpl, `https://api.github.com/repos/${owner}/${repo}/languages`, headers),
     getRaw(fetchImpl, owner, repo, branch, 'README.md', 60_000),
@@ -135,6 +135,7 @@ export async function loadFacts(owner, repo, { fetchImpl = fetch, token } = {}) 
     getRaw(fetchImpl, owner, repo, branch, 'Cargo.toml', 60_000),
     getRaw(fetchImpl, owner, repo, branch, 'pyproject.toml', 60_000),
     getRaw(fetchImpl, owner, repo, branch, 'requirements.txt', 20_000),
+    getRaw(fetchImpl, owner, repo, branch, 'wrangler.toml', 20_000),
   ]);
   if (!viaJsdelivr) {
     tree = apiTree;
@@ -199,6 +200,9 @@ export async function loadFacts(owner, repo, { fetchImpl = fetch, token } = {}) 
   const jsDeps = pkg ? Object.entries({ ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) }).slice(0, 30).map(([n, v]) => `${n}@${String(v).slice(0, 24)}`) : [];
   const other = otherEcosystem({ goMod, cargo, pyproject, requirements });
   const deps = jsDeps.length ? jsDeps : other.deps;
+  const compat = /^compatibility_date\s*=\s*"([\d-]+)"/m.exec(wrangler || '')?.[1];
+  if (!other.runtime && compat) other.runtime = `WORKERS ${compat}`;
+  const noDependencies = Boolean(pkg) && deps.length === 0;
 
   // The workspaces' own manifests carry the versions that matter (Electron, Expo, React Native...).
   const wsNames = Object.entries(workspaces).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k]) => k);
@@ -226,8 +230,8 @@ export async function loadFacts(owner, repo, { fetchImpl = fetch, token } = {}) 
 
   const readmeText = readme || '';
   // The first shell command in a fenced block: what a user types first.
-  const fence = readmeText.match(/```(?:bash|sh|shell|console)?\n([\s\S]*?)```/);
-  const firstCommand = (fence?.[1] || '').split('\n').map((l) => l.trim().replace(/^\$\s*/, '')).find((l) => l && !l.startsWith('#')) || '';
+  const isCommand = (l) => l && !l.startsWith('#') && /^[A-Za-z][\w./@:-]*(\s|$)/.test(l) && !/-->|--\(|│|→|[├└┌]/.test(l);
+  const firstCommand = [...readmeText.matchAll(/```(?:bash|sh|shell|console)?\n([\s\S]*?)```/g)].flatMap((m) => m[1].split('\n').map((l) => l.trim().replace(/^\$\s*/, ''))).find(isCommand) || '';
   const LOCKS = { 'bun.lock': 'bun', 'bun.lockb': 'bun', 'pnpm-lock.yaml': 'pnpm', 'package-lock.json': 'npm', 'yarn.lock': 'yarn', 'Cargo.lock': 'cargo', 'go.sum': 'go', 'poetry.lock': 'poetry', 'uv.lock': 'uv' };
   const lockfile = paths.map((x) => LOCKS[x]).find(Boolean) || null;
   const headings = [...readmeText.matchAll(/^#{1,3}\s+(.{1,80})$/gm)].map((m) => m[1].trim()).slice(0, 18);
@@ -252,6 +256,7 @@ export async function loadFacts(owner, repo, { fetchImpl = fetch, token } = {}) 
       packageManager: pkg?.packageManager || null,
       engines: pkg?.engines || null,
       runtime: other.runtime,
+      noDependencies,
       rootDependencies: deps,
       workspaceVersions: wsDeps,
       scripts: pkg?.scripts ? Object.keys(pkg.scripts).slice(0, 8) : [],
