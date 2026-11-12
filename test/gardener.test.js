@@ -381,3 +381,14 @@ test('from ungh the counts are exact, with stars and description', async () => {
   expect(f.counts.files).toBe(2); // the hidden .github folder is not the product
   expect(fallbackTower(f).foundation.text).toBe('2 FILES'); // exact: no +
 });
+
+test('a package name the facts do not contain is dropped', () => {
+  const facts = { counts: {}, stack: { rootDependencies: ['crawlee@4.0.0-rc.2'], workspaceVersions: {} }, workspaces: [{ name: 'website', files: 9 }] };
+  const t = parseTower(JSON.stringify({ core: { title: '@crawlee/core', disc: 'crawlee' }, red: { title: 'crawlee 4.0.0-rc.2' }, left: { title: 'website' }, right: { title: 'made-up' } }), facts);
+  expect(t.core.title).toBe('');
+  expect(t.core.disc).toBe('crawlee');
+  expect(t.red.title).toBe('crawlee 4.0.0-rc.2');
+  expect(t.left.title).toBe('website');
+  expect(t.right.title).toBe('');
+  expect(t.dropped.join('|')).toContain('core.title (the name is not in the facts)');
+});

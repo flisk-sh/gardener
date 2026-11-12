@@ -167,6 +167,13 @@ const clip = (s, max) => {
 const str = (v, max) => (typeof v === 'string' ? clip(v.replace(/[\u0000-\u001f\u007f<>]/g, ' ').replace(/\s+/g, ' ').trim(), max) : '');
 const arr = (v, n) => (Array.isArray(v) ? v.slice(0, n) : []);
 
+// The first word of a label that names a package or folder (core, red, the pentagon and triangle) must appear in the facts: a model that has heard
+// of @crawlee/core must not put it on a repo whose manifest says crawlee.
+export function nameGrounded(label, factsText) {
+  const token = (/^[@\w./-]+/.exec(String(label).trim())?.[0] || '').toLowerCase().replace(/[/.:-]+$/, '');
+  return token.length < 3 || factsText.toLowerCase().includes(token);
+}
+
 // A number in a label counts only when the facts contain it (commas ignored: 1,423 matches 1423).
 export function isGrounded(label, factsText) {
   const nums = String(label).match(/\d[\d.,]*\d|\d/g) || [];
@@ -191,8 +198,13 @@ export function parseTower(text, facts, { grounded = true } = {}) {
   const factsText = JSON.stringify(facts).replace(/,(?=\d{3})/g, '');
   const dropped = [];
   const approx = facts?.source === 'jsdelivr';
+  const NAMED = /^(core\.title|core\.disc|red\.title|upper\.pentagon\.0|upper\.triangle|left\.title|right\.title)$/;
   const g = (value, max, path) => {
     let s = str(value, max);
+    if (grounded && s && NAMED.test(path) && !nameGrounded(s, factsText)) {
+      dropped.push(`${path} (the name is not in the facts)`);
+      return '';
+    }
     // jsDelivr cuts big repos' file lists, so a count is a lower bound whatever the model wrote
     if (approx && s) s = s.replace(/(\d[\d,]*)(?![\d,]*\+)(\s+(?:TEST\s+|PATCH\s+|GENERATED\s+)?(?:FILES|WORKSPACES|PATCHES|DIRS|DIRECTORIES))/gi, '$1+$2');
     if (s && /^(braces|oss|cloud\.label|badge|insets)/.test(path) && EXAMPLE_STRINGS.has(squash(s)) && !squash(factsText).includes(squash(s))) {
