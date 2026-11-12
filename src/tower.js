@@ -164,7 +164,7 @@ export function renderTower(tower, { seed = tower.title || 'tower' } = {}) {
 
   // ---- crane and unpaid maintainers
   add(`<line x1="935" y1="1490" x2="1010" y2="1470" stroke="${INK}" stroke-width="3"/><line x1="935" y1="1462" x2="1010" y2="1448" stroke="${INK}" stroke-width="3"/><line x1="1010" y1="1470" x2="1080" y2="1470" stroke="${INK}" stroke-width="5"/><ellipse cx="1090" cy="1455" rx="10" ry="30" fill="#fff" stroke="${INK}" stroke-width="2.4"/>`);
-  text(1180, 1445, lines(t.crane?.title || 'AI AGENTS', 8), 30, { maxWidth: 150 });
+  text(1180, 1445, lines(t.crane?.title, 8), 30, { maxWidth: 150 });
   text(1180, 1500, lines(t.crane?.note, 24), 15, { maxWidth: 200 });
   if (t.oss) {
     text(1130, 1612, lines(t.oss, 17), 22, { anchor: 'start', maxWidth: 300 });

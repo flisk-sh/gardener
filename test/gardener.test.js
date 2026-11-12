@@ -299,7 +299,7 @@ test('the plain tower stands on its own for a repo without apps/ and packages/',
   expect(t.left).toMatchObject({ title: 'docs/', stat: '120+ FILES' });
   expect(t.right).toMatchObject({ title: 'cli/', stat: '100+ FILES' });
   expect(t.middle.title).toBe('3 TOP-LEVEL DIRS');
-  expect(t.core.title).toBe('COMMANDER');
+  expect(t.core.title).toBe('REACT');
   expect(t.runtime).toMatchObject({ bar: 'NODE >=22', tool: 'bun', toolNote: 'LOCKFILE' });
   expect(t.upper.plank).toBe('bun run dev');
   expect(t.crane.title).toBe('AI AGENTS');
@@ -343,4 +343,41 @@ test('a plain-facts tower is cached for minutes, a model-written one for a day, 
     expect(page).toMatch(/\.svg\?wait=1&v='\+version/);
     expect(page).toContain('version="v');
   });
+});
+
+test('the plain tower picks a well-known library, never the owner\'s own package, and flags an exact pin', () => {
+  const facts = {
+    repo: 'apify/apify-sdk-js', source: 'ungh', stars: 186, pushedAt: '2026-11-11T00:55:19Z', hints: ['DOCKER'], agentsFile: null,
+    counts: { files: 1085, tests: 46, patches: 1, generated: 0, nativeDirs: [], filesByLanguage: [['TypeScript', 600]] },
+    workspaces: [], workspaceCount: 0, workspaceGroups: [],
+    topLevel: [{ name: 'website', files: 922 }, { name: 'docs', files: 76 }, { name: 'test', files: 42 }, { name: 'patches', files: 1 }],
+    stack: { packageManager: 'pnpm@12.18.0', engines: { node: '>=22.13.0' }, rootDependencies: ['@apify/consts@^3.0.1', 'apify-client@^3.0.0', 'minimatch@^10.0.0', 'crawlee@4.0.0-rc.2', 'typescript@^5.9.0', 'vitest@^4.0.0'], workspaceVersions: {}, scripts: ['prepare', 'build', 'test'], lockfile: 'pnpm' },
+    readme: { headings: [], firstCommand: 'npm install apify', excerpt: 'Apify SDK for JavaScript.' },
+  };
+  const t = fallbackTower(facts);
+  expect(t.core).toMatchObject({ title: 'CRAWLEE', note: '4.0.0-rc.2 (EXACT PIN)' });
+  expect(t.core.title).not.toContain('APIFY');
+  expect(t.left).toMatchObject({ title: 'website/', stat: '922 FILES', note: '85% OF THE FILES' });
+  expect(t.badge).toBe('186 STARS');
+  expect(t.cloud).toEqual({ word: 'docker', label: 'DOCKER (IN THE REPO)' });
+  expect(t.upper.plank).toBe('pnpm run build');
+  expect(t.crane.title).toBe(''); // nothing in the README or an AGENTS file about agents
+  expect(t.neck.title).toBe('1 PATCH');
+  expect(t.insets.map((i) => i.kind)).toEqual(['tests', 'tiny']); // one patch file is not a drawing of its own
+});
+
+test('from ungh the counts are exact, with stars and description', async () => {
+  const f = await loadFacts('o', 'r', { fetchImpl: (u) => {
+    const x = String(u);
+    if (x.startsWith('https://api.github.com/')) return new Response('{}', { status: 403 });
+    if (x === 'https://ungh.cc/repos/o/r') return new Response(JSON.stringify({ repo: { description: 'demo', stars: 12, pushedAt: '2026-11-01T00:00:00Z', defaultBranch: 'main' } }));
+    if (x === 'https://ungh.cc/repos/o/r/files/HEAD') return new Response(JSON.stringify({ files: [{ path: 'apps/web/a.ts', size: 100 }, { path: 'apps/web/a.test.ts', size: 10 }, { path: '.github/workflows/ci.yml', size: 5 }] }));
+    return fakeFetch(x.replace('/HEAD/', '/main/'));
+  } });
+  expect(f.source).toBe('ungh');
+  expect(f.stars).toBe(12);
+  expect(f.pushedAt).toBe('2026-11-01T00:00:00Z');
+  expect(f.hints).toEqual(['GITHUB ACTIONS']);
+  expect(f.counts.files).toBe(2); // the hidden .github folder is not the product
+  expect(fallbackTower(f).foundation.text).toBe('2 FILES'); // exact: no +
 });

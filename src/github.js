@@ -21,6 +21,24 @@ async function getRaw(fetchImpl, owner, repo, ref, path, limit = 200_000) {
   }
 }
 
+// ungh.cc (unjs/ungh) is a free proxy for GitHub's public data: stars, description, last push and the complete file list, so counts are exact.
+// It is the first fallback; jsDelivr is the second.
+async function unghData(fetchImpl, owner, repo) {
+  try {
+    const [m, f] = await Promise.all([fetchImpl(`https://ungh.cc/repos/${owner}/${repo}`, { headers: UA }), fetchImpl(`https://ungh.cc/repos/${owner}/${repo}/files/HEAD`, { headers: UA })]);
+    if (!m.ok || !f.ok) return null;
+    const r = (await m.json()).repo;
+    const files = (await f.json()).files;
+    if (!r || !Array.isArray(files) || files.length === 0) return null;
+    return {
+      meta: { description: r.description || '', stargazers_count: Number.isFinite(r.stars) ? r.stars : null, topics: [], default_branch: r.defaultBranch || 'HEAD', pushed_at: r.pushedAt || null },
+      files: files.filter((x) => x && typeof x.path === 'string').map((x) => ({ path: x.path, size: Number(x.size) || 0 })),
+    };
+  } catch {
+    return null;
+  }
+}
+
 // GitHub's API rate-limits the shared IPs of Cloudflare Workers (HTTP 403). jsDelivr lists a repo's files (name and size, default branch with
 // @HEAD) with no such limit and no key, and raw.githubusercontent.com serves the files. What the API gave on top (stars, description, topics)
 // is missing then; everything else is the same.
@@ -50,20 +68,31 @@ export async function loadFacts(owner, repo, { fetchImpl = fetch, token } = {}) 
   let branch = 'HEAD';
   let tree = null;
   let languages = null;
-  let viaJsdelivr = false;
+  let viaJsdelivr = false; // true for either mirror
+  let mirror = 'github';
   let sizes = null;
   if (res.json) {
     meta = res.json;
     branch = typeof meta.default_branch === 'string' ? meta.default_branch : 'HEAD';
   } else {
     if (res.status === 404) return { error: 'not-found', status: 404 };
-    const alt = await jsdelivrFiles(fetchImpl, owner, repo);
-    if (alt.status === 404) return { error: 'not-found', status: 404 };
-    if (!alt.files) return { error: res.status === 403 || res.status === 429 ? 'github-rate-limited' : 'github-error', status: 503 };
+    const ungh = await unghData(fetchImpl, owner, repo);
+    if (ungh) {
+      mirror = 'ungh';
+      meta = ungh.meta;
+      branch = ungh.meta.default_branch;
+      tree = { json: { tree: ungh.files.map((f) => ({ type: 'blob', path: f.path })), truncated: false } };
+      sizes = ungh.files;
+    } else {
+      const alt = await jsdelivrFiles(fetchImpl, owner, repo);
+      if (alt.status === 404) return { error: 'not-found', status: 404 };
+      if (!alt.files) return { error: res.status === 403 || res.status === 429 ? 'github-rate-limited' : 'github-error', status: 503 };
+      mirror = 'jsdelivr';
+      meta = { description: '', stargazers_count: null, topics: [], pushed_at: null };
+      tree = { json: { tree: alt.files.map((f) => ({ type: 'blob', path: f.path })), truncated: false } };
+      sizes = alt.files;
+    }
     viaJsdelivr = true;
-    meta = { description: '', stargazers_count: null, topics: [] };
-    tree = { json: { tree: alt.files.map((f) => ({ type: 'blob', path: f.path })), truncated: false } };
-    sizes = alt.files;
   }
 
   const [apiTree, apiLanguages, readme, agents, rootPkg] = await Promise.all([
@@ -96,6 +125,21 @@ export async function loadFacts(owner, repo, { fetchImpl = fetch, token } = {}) 
   let patches = 0;
   let generated = 0;
   const native = new Set();
+  const hints = new Set();
+  for (const item of Array.isArray(tree?.json?.tree) ? tree.json.tree : []) {
+    if (hints.size >= 4) break;
+    const p = typeof item.path === 'string' ? item.path : '';
+    const base = p.split('/').pop();
+    if (p.startsWith('.github/workflows/')) hints.add('GITHUB ACTIONS');
+    else if (/^(Dockerfile|docker-compose\.ya?ml|compose\.ya?ml)$/.test(base)) hints.add('DOCKER');
+    else if (/^wrangler\.(toml|jsonc?)$/.test(base)) hints.add('CLOUDFLARE WORKERS');
+    else if (base === 'vercel.json') hints.add('VERCEL');
+    else if (base === 'netlify.toml') hints.add('NETLIFY');
+    else if (base === 'fly.toml') hints.add('FLY.IO');
+    else if (base === 'render.yaml') hints.add('RENDER');
+    else if (/\.tf$/.test(base)) hints.add('TERRAFORM');
+    else if (base === 'Chart.yaml' || /^(k8s|kubernetes)\//.test(p)) hints.add('KUBERNETES');
+  }
   for (const p of paths) {
     if (TEST_FILE.test(p)) tests++;
     const ext = p.includes('.') ? p.split('.').pop().toLowerCase() : '';
@@ -159,7 +203,9 @@ export async function loadFacts(owner, repo, { fetchImpl = fetch, token } = {}) 
     stars: Number.isFinite(meta.stargazers_count) ? meta.stargazers_count : null,
     topics: Array.isArray(meta.topics) ? meta.topics.slice(0, 8) : [],
     languages: langBytes,
-    source: viaJsdelivr ? 'jsdelivr' : 'github',
+    source: mirror,
+    pushedAt: meta.pushed_at || null,
+    hints: [...hints],
     treeTruncated: Boolean(tree?.json?.truncated) || (tree?.json?.tree?.length || 0) > MAX_PATHS,
     counts: { files, tests, patches, generated, nativeDirs: [...native].slice(0, 8), filesByLanguage: Object.entries(byExt).sort((a, b) => b[1] - a[1]).slice(0, 6) },
     topLevel: Object.entries(top).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => ({ name, files: count })),

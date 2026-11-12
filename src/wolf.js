@@ -84,7 +84,7 @@ const EXAMPLE2_TOWER = {
   neck: { title: 'GPU KERNELS', note: 'gpu-kernels/ : ONE SHADER AT A TIME' },
   upper: { pentagon: ['TAURI', '1.6.0'], pentagonNote: 'A WEBVIEW', triangle: 'WGPU 0.19', plank: 'cargo run' },
   red: { title: 'WGPU 0.19.1', note: 'EXACT PIN' },
-  crane: { title: 'NO AGENTS', note: 'JUST A COMPRESSOR' },
+  crane: { title: '', note: '' },
   oss: 'THE PEOPLE WHO WRITE GPU DRIVERS',
   cloud: { word: 'browser', label: 'YOUR BROWSER (OUT OF REPO)' },
   badge: 'ONE FILE, SMALLER',
@@ -280,41 +280,61 @@ const num = (n) => Number(n).toLocaleString('en-US');
 export function fallbackTower(facts) {
   // jsDelivr truncates the file list of big repos (948 of about 32,000 files for one), so its counts are lower bounds: write them as N+.
   const plus = facts.source === 'jsdelivr' ? '+' : '';
-  const name = facts.repo.split('/')[1];
+  const [owner, name] = facts.repo.split('/');
+  const count = (n, one, many = `${one}S`) => `${num(n)}${plus} ${n === 1 && !plus ? one : many}`;
   const langs = facts.counts.filesByLanguage || [];
   const ver = facts.stack?.workspaceVersions || {};
-  const rootDeps = (facts.stack?.rootDependencies || []).map((d) => d.replace(/@[^@]*$/, '')).filter((d) => d && !d.startsWith('@types/') && !/^(typescript|vitest|biome|@biomejs\/biome|knip|esbuild)$/.test(d));
-  const deps = [...Object.keys(ver), ...rootDeps];
+  // dependencies as { name, version } from "name@range" (a scoped name starts with @, so split on the LAST @)
+  const entries = [
+    ...(facts.stack?.rootDependencies || []).map((d) => /^(.+?)@([^@]+)$/.exec(d)).filter(Boolean).map((m) => ({ name: m[1], version: m[2] })),
+    ...Object.entries(ver).map(([n, v]) => ({ name: n, version: v === 'catalog' ? '' : v })),
+  ];
+  const tooling = /^(@types\/|@commitlint|commitlint|husky|prettier|oxfmt|oxlint|@oxlint|@?biome|@biomejs|eslint|@eslint|vitest|jest|tsx?$|typescript$|knip|esbuild|@apify\/(oxlint|tsconfig)|lint-staged)/;
+  // the library the repo is about: not tooling, not the owner's own packages, unscoped names first
+  const own = (n) => n.toLowerCase().startsWith(`@${owner.toLowerCase()}/`) || n.toLowerCase().startsWith(owner.toLowerCase()) || n.toLowerCase().startsWith(name.toLowerCase());
+  const libs = entries.filter((e) => !tooling.test(e.name) && !own(e.name));
+  const KNOWN = ['electron', 'next', 'nuxt', 'astro', 'remix', 'svelte', 'vue', 'react', 'express', 'fastify', 'hono', 'koa', '@nestjs/core', 'prisma', 'drizzle-orm', 'effect', 'crawlee', 'playwright', 'puppeteer', 'ink', 'commander', 'tailwindcss', 'vite', 'zod', 'axios'];
+  const rank = (e) => (KNOWN.includes(e.name) ? KNOWN.indexOf(e.name) : KNOWN.length + (e.name.startsWith('@') ? 1 : 0));
+  const seen = new Set();
+  const deps = [...libs].sort((a, b) => rank(a) - rank(b)).filter((e) => !seen.has(e.name) && seen.add(e.name));
+  const core = deps[0];
+  const exact = (e) => /^\d/.test(e.version);
+  const pinned = deps.find((e) => exact(e) && e !== core);
   const node = facts.stack?.engines?.node;
   // apps/* and packages/* when the repo has them, else its biggest top-level folders
   const parts = (facts.workspaces || []).length >= 2 ? facts.workspaces : (facts.topLevel || []).filter((t) => t.name !== '(root)').map((t) => ({ name: `${t.name}/`, files: t.files }));
   const pm = facts.stack?.packageManager ? String(facts.stack.packageManager).replace('@', ' ') : facts.stack?.lockfile || '';
-  const core = deps[0];
-  const small = [...parts].sort((a, b) => a.files - b.files)[0];
+  const small = [...parts].filter((x) => x.files >= 3).sort((a, b) => a.files - b.files)[0];
   const rule = /\b(never|do not|don't)\b[^.\n]{6,70}/i.exec(facts.agentsFile || '')?.[0];
+  const share = (n) => (facts.counts.files > 0 ? `${Math.max(1, Math.round((n / facts.counts.files) * 100))}% OF THE FILES` : '');
+  const scripts = facts.stack?.scripts || [];
+  const script = ['dev', 'start', 'build', 'test'].find((x) => scripts.includes(x)) || scripts[0];
+  const talksAboutAgents = Boolean(facts.agentsFile) || /\b(AI agents?|MCP|Claude|LLMs?|Copilot|Codex)\b/i.test(`${facts.description || ''} ${facts.readme?.excerpt || ''}`);
+  const hint = (facts.hints || [])[0];
   const insets = [];
-  if (facts.counts.tests > 0) insets.push({ kind: 'tests', caption: `${num(facts.counts.tests)}${plus} TEST FILES` });
-  if (facts.counts.patches > 0) insets.push({ kind: 'tape', caption: `${num(facts.counts.patches)}${plus} PATCH FILES` });
+  if (facts.counts.tests > 0) insets.push({ kind: 'tests', caption: count(facts.counts.tests, 'TEST FILE') });
+  if (facts.counts.patches >= 3) insets.push({ kind: 'tape', caption: count(facts.counts.patches, 'PATCH FILE') });
   if ((facts.counts.nativeDirs || []).length > 0) insets.push({ kind: 'rocket', caption: `NATIVE: ${facts.counts.nativeDirs.slice(0, 2).join(', ')}`.slice(0, 30) });
   if ((facts.counts.nativeDirs || []).length > 0) insets.push({ kind: 'ghost', caption: `${facts.counts.nativeDirs[0]} (NATIVE)`.slice(0, 30) });
-  if (facts.counts.generated > 0) insets.push({ kind: 'scroll', caption: `${num(facts.counts.generated)}${plus} GENERATED FILES` });
+  if (facts.counts.generated > 0) insets.push({ kind: 'scroll', caption: count(facts.counts.generated, 'GENERATED FILE') });
   if (rule) insets.push({ kind: 'nosign', caption: clip(up(rule), 30) });
-  if (small && parts.length > 2) insets.push({ kind: 'tiny', caption: `${small.name} (${num(small.files)}${plus} FILES)`.slice(0, 30) });
+  if (small && parts.length > 2) insets.push({ kind: 'tiny', caption: `${small.name} (${count(small.files, 'FILE')})`.slice(0, 30) });
+  const HINT_WORD = { 'GITHUB ACTIONS': 'ci', DOCKER: 'docker', 'CLOUDFLARE WORKERS': 'workers', VERCEL: 'vercel', NETLIFY: 'netlify', 'FLY.IO': 'fly', RENDER: 'render', TERRAFORM: 'cloud', KUBERNETES: 'k8s' };
   return {
     title: up(name).slice(0, 24),
-    foundation: { stones: langs.slice(0, 4).map(([n]) => up(n).slice(0, 12)), text: `${num(facts.counts.files)}${plus} FILES` },
-    runtime: { bar: node ? `NODE ${node}` : '', tool: pm, toolNote: facts.stack?.lockfile && !facts.stack?.packageManager ? 'LOCKFILE' : '' },
-    core: { title: core ? up(core).slice(0, 16) : '', note: core && ver[core] ? String(ver[core]) : '', disc: deps[1] ? deps[1].slice(0, 26) : '' },
+    foundation: { stones: langs.slice(0, 4).map(([n]) => up(n).slice(0, 12)), text: count(facts.counts.files, 'FILE') },
+    runtime: { bar: node ? `NODE ${node}` : '', tool: pm, toolNote: facts.stack?.packageManager ? 'PINNED' : facts.stack?.lockfile ? 'LOCKFILE' : '' },
+    core: { title: core ? up(core.name).slice(0, 16) : '', note: core ? `${core.version}${exact(core) ? ' (EXACT PIN)' : ''}`.trim().slice(0, 30) : '', disc: deps[1] ? deps[1].name.slice(0, 26) : '' },
     middle: { title: facts.workspaceCount ? `${facts.workspaceCount}${plus} WORKSPACES` : parts.length ? `${parts.length} TOP-LEVEL DIRS` : '', note: facts.workspaceCount ? (facts.workspaceGroups || []).slice(0, 3).map((g) => `${g.count} ${up(g.name)}`).join(' + ').slice(0, 46) : parts.slice(0, 5).map((x) => x.name).join(', ').slice(0, 46) },
-    left: { title: parts[0] ? parts[0].name.slice(0, 16) : '', stat: parts[0] ? `${num(parts[0].files)}${plus} FILES` : '', note: '' },
-    right: { title: parts[1] ? parts[1].name.slice(0, 16) : '', stat: parts[1] ? `${num(parts[1].files)}${plus} FILES` : '', note: '' },
-    neck: { title: facts.counts.patches > 0 ? `${facts.counts.patches}${plus} PATCHES` : '', note: facts.counts.patches > 0 ? 'patches/' : '' },
-    upper: { pentagon: [deps[2] ? up(deps[2]).slice(0, 8) : '', ''], pentagonNote: '', triangle: deps[3] ? up(deps[3]).slice(0, 12) : '', plank: facts.stack?.scripts?.length && pm ? `${pm.split(' ')[0]} run ${facts.stack.scripts.find((x) => /^(dev|start)$/.test(x)) || facts.stack.scripts[0]}`.slice(0, 22) : '' },
-    red: { title: ver.electron ? `ELECTRON ${ver.electron}` : '', note: '' },
-    crane: facts.agentsFile ? { title: 'AI AGENTS', note: 'AGENTS.md IS IN THE REPO' } : { title: '', note: '' },
-    oss: core ? `THE MAINTAINERS OF ${up(core)}`.slice(0, 48) : '',
-    cloud: { word: '', label: '' },
-    badge: facts.stars != null ? `${num(facts.stars)} STARS` : '',
+    left: { title: parts[0] ? parts[0].name.slice(0, 16) : '', stat: parts[0] ? count(parts[0].files, 'FILE') : '', note: parts[0] ? share(parts[0].files) : '' },
+    right: { title: parts[1] ? parts[1].name.slice(0, 16) : '', stat: parts[1] ? count(parts[1].files, 'FILE') : '', note: parts[1] ? share(parts[1].files) : '' },
+    neck: { title: facts.counts.patches > 0 ? count(facts.counts.patches, 'PATCH', 'PATCHES') : '', note: facts.counts.patches > 0 ? 'patches/' : '' },
+    upper: { pentagon: [deps[2] ? up(deps[2].name).slice(0, 8) : '', ''], pentagonNote: deps[2]?.version ? deps[2].version.slice(0, 14) : '', triangle: deps[3] ? up(deps[3].name).slice(0, 12) : '', plank: script && pm ? `${pm.split(' ')[0]} run ${script}`.slice(0, 22) : '' },
+    red: ver.electron ? { title: `ELECTRON ${ver.electron}`, note: exact({ version: ver.electron }) ? 'EXACT PIN' : '' } : pinned ? { title: `${up(pinned.name)} ${pinned.version}`.slice(0, 20), note: 'EXACT PIN' } : { title: '', note: '' },
+    crane: talksAboutAgents ? { title: 'AI AGENTS', note: facts.agentsFile ? 'AGENTS.md IS IN THE REPO' : 'THE README MENTIONS THEM' } : { title: '', note: '' },
+    oss: core ? `THE MAINTAINERS OF ${up(core.name)}`.slice(0, 48) : '',
+    cloud: hint ? { word: HINT_WORD[hint] || 'cloud', label: `${hint} (IN THE REPO)`.slice(0, 44) } : { word: '', label: '' },
+    badge: facts.stars != null ? `${num(facts.stars)} STARS` : facts.pushedAt ? `LAST PUSH ${String(facts.pushedAt).slice(0, 10)}` : '',
     braces: { left: `ALL OF ${up(name)}`.slice(0, 22), right: facts.readme?.firstCommand ? `SOMEONE TYPING ${facts.readme.firstCommand}`.slice(0, 40) : '' },
     zoom: { say: 'it works?!', aside: '(on my machine)' },
     insets,
