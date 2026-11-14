@@ -61,7 +61,7 @@ function layout({ title, origin, body, path = '/' }) {
 <meta name="color-scheme" content="light dark">${path !== '/' ? '<meta name="robots" content="noindex,nofollow">' : ''}
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <meta property="og:type" content="website"><meta property="og:site_name" content="Gardener"><meta property="og:title" content="${t}"><meta property="og:description" content="${esc(DESC)}"><meta property="og:url" content="${esc(origin + path)}">
-<style>${CSS}</style><script src="https://flisk.si/assets/bar.js" defer></script></head><body>
+<style>${CSS}</style><script defer data-domain="gardener.flisk.si" src="https://flisk.sh/a.js"></script><script src="https://flisk.si/assets/bar.js" defer></script></head><body>
 <header class="top stage"><nav class="wrap" aria-label="Site"><a href="/"><img src="/icon.svg" alt="" width="26" height="26">Gardener</a><a href="https://flisk.sh">Flisk</a></nav></header>
 ${body}
 <footer><div class="wrap">Gardener: every number is counted from the repo. The Wolf model (flisk-wolf) writes the labels while its free daily allowance lasts, and plain facts fill in after that. Nothing is stored but the finished tower. <a href="https://github.com/flisk-sh/gardener">Open source</a>, made by <a href="https://flisk.sh">Flisk</a>.</div></footer>

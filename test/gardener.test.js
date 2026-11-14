@@ -494,3 +494,9 @@ test('fact-backed drawings: bird for a host, ghost for a side language, shark fo
   expect(kinds).toEqual(expect.arrayContaining(['ghost', 'bird', 'shark']));
   expect(t.insets.find((i) => i.kind === 'bird').caption).toBe('DEPLOY WAITS ON RENDER');
 });
+
+test('the page loads Flisk Analytics in <head>', async () => {
+  const html = await (await worker.fetch(new Request('https://gardener.test/'), {})).text();
+  const head = html.slice(html.indexOf('<head>'), html.indexOf('</head>'));
+  expect(head).toContain('<script defer data-domain="gardener.flisk.si" src="https://flisk.sh/a.js"></script>');
+});
