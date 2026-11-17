@@ -61,7 +61,9 @@ function layout({ title, origin, body, path = '/' }) {
 <meta name="color-scheme" content="light dark">${path !== '/' ? '<meta name="robots" content="noindex,nofollow">' : ''}
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <meta property="og:type" content="website"><meta property="og:site_name" content="Gardener"><meta property="og:title" content="${t}"><meta property="og:description" content="${esc(DESC)}"><meta property="og:url" content="${esc(origin + path)}">
-<style>${CSS}</style><script defer data-domain="gardener.flisk.si" src="https://flisk.sh/a.js"></script><script src="https://flisk.si/assets/bar.js" defer></script></head><body>
+<style>${CSS}.skip-link{position:absolute;top:0;left:0;z-index:1000;transform:translateY(-120%);background:#fff;color:#111;padding:.5rem 1rem}
+.skip-link:focus{transform:none}
+</style><script defer data-domain="gardener.flisk.si" src="https://flisk.sh/a.js"></script><script src="https://flisk.si/assets/bar.js" defer></script></head><body><a class="skip-link" href="#main-content">Skip to content</a>
 <header class="top stage"><nav class="wrap" aria-label="Site"><a href="/"><img src="/icon.svg" alt="" width="26" height="26">Gardener</a><a href="https://flisk.sh">Flisk</a></nav></header>
 ${body}
 <footer><div class="wrap">Gardener: every number is counted from the repo. The Wolf model (flisk-wolf) writes the labels while its free daily allowance lasts, and plain facts fill in after that. Nothing is stored but the finished tower. <a href="https://github.com/flisk-sh/gardener">Open source</a>, made by <a href="https://flisk.sh">Flisk</a>.</div></footer>
@@ -75,7 +77,7 @@ export function page(origin, { error = '', value = '' } = {}) {
   return layout({
     title: 'Gardener: grow a dependency tower from any repo',
     origin,
-    body: `<main><section class="hero stage"><div class="wrap">
+    body: `<main id="main-content" tabindex="-1"><section class="hero stage"><div class="wrap">
 <h1 class="grad">Grow a dependency tower from any repo</h1>
 <p class="lede">Paste a GitHub repo. Gardener counts its parts, asks the Wolf model to label the tower, and draws the meme: everything that holds everything up, and the one thing that is holding on by a thread.</p>
 ${error ? `<p class="error" role="alert">${esc(error)}</p>` : ''}${form(value)}
@@ -98,7 +100,7 @@ export function notFoundPage(origin, path) {
     title: 'Page not found · Gardener',
     origin,
     path,
-    body: `<main><section class="hero stage"><div class="wrap">
+    body: `<main id="main-content" tabindex="-1"><section class="hero stage"><div class="wrap">
 <h1 class="grad">Page not found</h1>
 <a class="btn" href="/">Back to Gardener</a>
 </div></section></main>`,
@@ -112,7 +114,7 @@ export function resultPage(origin, repo, version = '') {
     title: `${repo} tower · Gardener`,
     origin,
     path: `/${repo}`,
-    body: `<main><section class="hero stage"><div class="wrap">
+    body: `<main id="main-content" tabindex="-1"><section class="hero stage"><div class="wrap">
 <h1 class="grad">${esc(repo)}</h1>
 <p class="lede" id="lede">Growing the tower. A new one takes up to 30 seconds.</p>
 <p id="err" class="error" role="alert" hidden>Could not grow a tower for ${esc(repo)}. Is the repo public, and is GitHub answering?</p>
