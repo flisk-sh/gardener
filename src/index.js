@@ -140,6 +140,7 @@ const app = {
 
     if (url.pathname === '/ready') return text('ok');
     if (url.pathname === '/' && get) return html(page(origin));
+    if (url.pathname === '/llms.txt') return new Response('# Gardener\n\n> Render a GitHub repository as a visual tower.\n\n## Links\n- [Gardener](https://gardener.flisk.si/)\n- [Source](https://github.com/flisk-sh/gardener)\n', { headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'public, max-age=86400' } });
     if (url.pathname === '/robots.txt') return text(ROBOTS);
     if (url.pathname === '/sitemap.xml') return new Response(SITEMAP, { headers: { 'content-type': 'application/xml; charset=utf-8' } });
     if (url.pathname === '/icon.svg') return new Response(ICON, { headers: { 'content-type': 'image/svg+xml', 'cache-control': 'public, max-age=86400' } });
