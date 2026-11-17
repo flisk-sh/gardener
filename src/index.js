@@ -126,6 +126,18 @@ const svgResponse = (entry) => new Response(entry.svg, { headers: { ...SVG, 'cac
 const text = (body, status = 200) => new Response(body, { status, headers: { 'content-type': 'text/plain; charset=utf-8' } });
 const html = (body, status = 200) => new Response(body, { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 
+async function cachedHome(request, body) {
+  const bytes = new TextEncoder().encode(body);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  const tag = '"' + Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('') + '"';
+  const headers = { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'public, max-age=300', etag: tag };
+  const tags = (request.headers.get('if-none-match') ?? '').split(',');
+  if (tags.some((value) => value.trim() === '*' || value.trim().replace(/^W\//, '') === tag)) {
+    return new Response(null, { status: 304, headers });
+  }
+  return new Response(request.method === 'HEAD' ? null : bytes, { headers });
+}
+
 // Every /<owner>/<repo> is a valid URL, so the space is endless: crawlers get the home page only (the same lesson as tools.flisk.si, where GPTBot
 // followed endless filter links and used up the account's Workers Free limit).
 export const ROBOTS = 'User-agent: *\nAllow: /$\nDisallow: /\n\nSitemap: https://gardener.flisk.si/sitemap.xml\n';
@@ -139,7 +151,7 @@ const app = {
     const get = request.method === 'GET' || request.method === 'HEAD';
 
     if (url.pathname === '/ready') return text('ok');
-    if (url.pathname === '/' && get) return html(page(origin));
+    if (url.pathname === '/' && get) return cachedHome(request, page(origin));
     if (url.pathname === '/robots.txt') return text(ROBOTS);
     if (url.pathname === '/sitemap.xml') return new Response(SITEMAP, { headers: { 'content-type': 'application/xml; charset=utf-8' } });
     if (url.pathname === '/icon.svg') return new Response(ICON, { headers: { 'content-type': 'image/svg+xml', 'cache-control': 'public, max-age=86400' } });
