@@ -124,7 +124,7 @@ const placeholder = (repo) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="
 // A tower the model wrote is kept for a day. A plain-facts one is replaced by a better one as soon as the model has allowance again, so browsers and
 // image proxies must not keep it for long (an hour of max-age is why a visitor kept seeing the blank tower after a better one existed).
 const svgResponse = (entry) => new Response(entry.svg, { headers: { ...SVG, 'cache-control': entry.source.startsWith('wolf') ? 'public, max-age=3600, s-maxage=86400' : 'public, max-age=300, s-maxage=300', 'x-gardener-source': entry.source, 'x-gardener-fields-from-model': String(entry.filled) } });
-const text = (body, status = 200) => new Response(body, { status, headers: { 'content-type': 'text/plain; charset=utf-8' } });
+const text = (body, status = 200, headers = {}) => new Response(body, { status, headers: { 'content-type': 'text/plain; charset=utf-8', ...headers } });
 const html = (body, status = 200) => new Response(body, { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 
 // Every /<owner>/<repo> is a valid URL, so the space is endless: crawlers get the home page only (the same lesson as tools.flisk.si, where GPTBot
@@ -141,7 +141,7 @@ const app = {
 
     if (url.pathname === '/ready') return text('ok');
     if (url.pathname === '/' && get) return html(page(origin));
-    if (url.pathname === '/robots.txt') return text(ROBOTS);
+    if (url.pathname === '/robots.txt') return text(ROBOTS, 200, { 'cache-control': 'public, max-age=86400' });
     if (url.pathname === '/sitemap.xml') return new Response(SITEMAP, { headers: { 'content-type': 'application/xml; charset=utf-8' } });
     if (url.pathname === '/icon.svg') return new Response(ICON, { headers: { 'content-type': 'image/svg+xml', 'cache-control': 'public, max-age=86400' } });
     if (url.pathname === '/sample.svg') return new Response(SAMPLE, { headers: { ...SVG, 'cache-control': 'public, max-age=86400' } });
