@@ -11,7 +11,7 @@ const EXPECTED = {
 };
 const expectBaseline = (res) => {
   for (const [k, v] of Object.entries(EXPECTED)) expect(res.headers.get(k)).toBe(v);
-  expect(res.headers.get('content-security-policy')).toContain("frame-ancestors 'self'");
+  expect(res.headers.get('content-security-policy')).toContain("frame-ancestors 'self' https://analytics.flisk.si");
 };
 
 const call = (path, init) => worker.fetch(new Request(`https://gardener.flisk.si${path}`, init), {});
@@ -26,7 +26,7 @@ test('a missing header is added, an existing one is kept and nothing is duplicat
   const res = withSecurityHeaders(new Response('x', { headers: { 'x-frame-options': 'DENY', 'referrer-policy': 'no-referrer', 'content-security-policy': "default-src 'none'" } }));
   expect(res.headers.get('x-frame-options')).toBe('DENY');
   expect(res.headers.get('referrer-policy')).toBe('no-referrer');
-  expect(res.headers.get('content-security-policy')).toBe("default-src 'none'; frame-ancestors 'self'");
+  expect(res.headers.get('content-security-policy')).toBe("default-src 'none'; frame-ancestors 'self' https://analytics.flisk.si");
   expect(res.headers.get('x-content-type-options')).toBe('nosniff');
 });
 
