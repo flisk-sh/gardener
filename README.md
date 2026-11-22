@@ -46,3 +46,7 @@ Bump `VERSION` in `src/index.js` whenever the prompt or the drawing changes, so 
 - **No cost:** nothing was bought. The account is on Workers Free, where Workers AI stops at 10,000 neurons a day instead of billing; `DAILY_MODEL_CAP = "6"` keeps Gardener to about 2,000 of them. Raise it on purpose, and only if the account cannot be billed for overage.
 - **jsDelivr fallback (added 2026-11-12):** when GitHub's API refuses, the file list comes from jsDelivr (`data.jsdelivr.com/v1/packages/gh/<owner>/<repo>@HEAD?structure=flat`) and the README and manifests from raw.githubusercontent.com, both free and unlimited by key. jsDelivr cuts the list of big repos (948 of about 32,000 files for t3code), so in that mode every count is a lower bound and is written `N+`, and stars and description are missing. A GitHub token (secret `GITHUB_TOKEN`) still gives exact counts.
 - **GitHub rate limit (why the fallback exists):** unauthenticated GitHub API calls from a Cloudflare Worker share IPs and are rate limited (HTTP 403). Until a `GITHUB_TOKEN` secret is set (a personal access token with no scopes is enough, and free), live towers answer 503 "GitHub is limiting requests". Locally it works.
+
+## License
+
+MIT, see [LICENSE](LICENSE).

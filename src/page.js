@@ -10,6 +10,7 @@ const CSS = `
 @media (prefers-color-scheme:dark){:root{--bg:#141413;--fg:#eceae4;--muted:#a29f97;--line:#272a31;--card:#16181d;--accent:#5ee0a0}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
 a{color:var(--accent);text-underline-offset:3px}.wrap{max-width:880px;margin:0 auto;padding:0 20px}
+.skip-link{position:absolute;left:-9999px;top:0;z-index:100;padding:10px 14px;background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:8px;font-weight:700}.skip-link:focus{left:12px;top:12px;outline:2px solid var(--accent);outline-offset:2px}
 .stage{position:relative;overflow:hidden;background:#07080c;color:#f4f3ef;--fg:#f4f3ef;--muted:#b0afba;--line:#262833;--card:#11131a;--accent:#5ee0a0}
 .stage::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px);background-size:56px 56px;-webkit-mask-image:radial-gradient(60% 65% at 50% 38%,#000,transparent 75%);mask-image:radial-gradient(60% 65% at 50% 38%,#000,transparent 75%)}
 .stage::after{content:"";position:absolute;inset:-10%;background:radial-gradient(38% 32% at 22% 18%,rgba(94,224,160,.30),transparent 70%),radial-gradient(32% 30% at 82% 30%,rgba(31,157,107,.28),transparent 70%),radial-gradient(40% 36% at 55% 95%,rgba(91,124,255,.22),transparent 70%);pointer-events:none}
@@ -60,8 +61,9 @@ function layout({ title, origin, body, path = '/' }) {
 <meta name="theme-color" content="#07080c">
 <meta name="color-scheme" content="light dark">${path !== '/' ? '<meta name="robots" content="noindex,nofollow">' : ''}
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta property="og:type" content="website"><meta property="og:site_name" content="Gardener"><meta property="og:title" content="${t}"><meta property="og:description" content="${esc(DESC)}"><meta property="og:url" content="${esc(origin + path)}"><meta property="og:image" content="${esc(origin)}/og.png"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="${esc(origin)}/og.png">
-<style>${CSS}</style><script defer data-domain="gardener.flisk.si" src="https://flisk.sh/a.js"></script><script src="https://flisk.si/assets/bar.js" defer></script></head><body>
+<style>${CSS}</style><script defer data-domain="gardener.flisk.si" src="https://flisk.sh/a.js"></script><script src="https://flisk.si/assets/bar.js" data-product="Gardener" data-icon="gardener" data-accent="#1f9d6b" data-text="Turn any GitHub repo into a tower you can grow." defer></script></head><body><a class="skip-link" href="#main">Skip to content</a>
 <header class="top stage"><nav class="wrap" aria-label="Site"><a href="/"><img src="/icon.svg" alt="" width="26" height="26">Gardener</a><a href="https://flisk.sh">Flisk</a></nav></header>
 ${body}
 <footer><div class="wrap">Gardener: every number is counted from the repo. The Wolf model (flisk-wolf) writes the labels while its free daily allowance lasts, and plain facts fill in after that. Nothing is stored but the finished tower. <a href="https://github.com/flisk-sh/gardener">Open source</a>, made by <a href="https://flisk.sh">Flisk</a>.</div></footer>
@@ -75,7 +77,7 @@ export function page(origin, { error = '', value = '' } = {}) {
   return layout({
     title: 'Gardener: grow a dependency tower from any repo',
     origin,
-    body: `<main><section class="hero stage"><div class="wrap">
+    body: `<main id="main"><section class="hero stage"><div class="wrap">
 <h1 class="grad">Grow a dependency tower from any repo</h1>
 <p class="lede">Paste a GitHub repo. Gardener draws a meme tower of everything it depends on, and marks the one part holding on by a thread.</p>
 ${error ? `<p class="error" role="alert">${esc(error)}</p>` : ''}${form(value)}
@@ -98,7 +100,7 @@ export function notFoundPage(origin, path) {
     title: 'Page not found · Gardener',
     origin,
     path,
-    body: `<main><section class="hero stage"><div class="wrap">
+    body: `<main id="main"><section class="hero stage"><div class="wrap">
 <h1 class="grad">Page not found</h1>
 <a class="btn" href="/">Back to Gardener</a>
 </div></section></main>`,
@@ -112,7 +114,7 @@ export function resultPage(origin, repo, version = '') {
     title: `${repo} tower · Gardener`,
     origin,
     path: `/${repo}`,
-    body: `<main><section class="hero stage"><div class="wrap">
+    body: `<main id="main"><section class="hero stage"><div class="wrap">
 <h1 class="grad">${esc(repo)}</h1>
 <p class="lede" id="lede">Growing the tower. A new one takes up to 30 seconds.</p>
 <p id="err" class="error" role="alert" hidden>Could not grow a tower for ${esc(repo)}. Is the repo public, and is GitHub answering?</p>
