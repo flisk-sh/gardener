@@ -6,11 +6,8 @@ import { parseRepoInput } from './repo-input.js';
 import { ICON, notFoundPage, page, resultPage } from './page.js';
 import SAMPLE from './sample.js';
 import { withSecurityHeaders } from './security-headers.js';
-<<<<<<< HEAD
 import { OG_PNG } from './og.js';
-=======
 import { appleTouchIcon } from './apple-touch-icon.js';
->>>>>>> origin/main
 
 // Bump when the prompt or the drawing changes: it is part of the cache key, so old towers are not served for a week.
 export const VERSION = 'v15';
@@ -150,11 +147,8 @@ const app = {
     if (url.pathname === '/robots.txt') return new Response(ROBOTS, { headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'public, max-age=86400' } });
     if (url.pathname === '/sitemap.xml') return new Response(SITEMAP, { headers: { 'content-type': 'application/xml; charset=utf-8' } });
     if (url.pathname === '/icon.svg') return new Response(ICON, { headers: { 'content-type': 'image/svg+xml', 'cache-control': 'public, max-age=86400' } });
-<<<<<<< HEAD
     if (url.pathname === '/og.png') return new Response(OG_PNG, { headers: { 'content-type': 'image/png', 'cache-control': 'public, max-age=31536000, immutable' } });
-=======
     if (url.pathname === '/apple-touch-icon.png') return new Response(appleTouchIcon, { headers: { 'content-type': 'image/png', 'cache-control': 'public, max-age=31536000, immutable' } });
->>>>>>> origin/main
     if (url.pathname === '/sample.svg') return new Response(SAMPLE, { headers: { ...SVG, 'cache-control': 'public, max-age=86400' } });
 
     if (url.pathname === '/check' && get) {
