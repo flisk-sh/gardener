@@ -521,3 +521,10 @@ test('unknown paths still return plain errors when HTML is not accepted', async 
     expect(await response.text()).toBe('not found');
   }
 });
+
+test('the home page lead is short and plain', async () => {
+  const { page } = await import('../src/page.js');
+  const html = page('https://gardener.flisk.si');
+  const lead = /<p class="lede">([^<]+)<\/p>/.exec(html)[1];
+  expect(lead.split(/\s+/).length).toBeLessThanOrEqual(32);
+});

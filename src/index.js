@@ -1,3 +1,4 @@
+import { traced } from './trace.js';
 import { loadFacts, validRepo } from './github.js';
 import { askWolf, buildMessages, fallbackTower, mergeTower, parseTower } from './wolf.js';
 import { renderTower } from './tower.js';
@@ -5,6 +6,7 @@ import { parseRepoInput } from './repo-input.js';
 import { ICON, notFoundPage, page, resultPage } from './page.js';
 import SAMPLE from './sample.js';
 import { withSecurityHeaders } from './security-headers.js';
+import { appleTouchIcon } from './apple-touch-icon.js';
 
 // Bump when the prompt or the drawing changes: it is part of the cache key, so old towers are not served for a week.
 export const VERSION = 'v15';
@@ -152,9 +154,11 @@ const app = {
 
     if (url.pathname === '/ready') return text('ok');
     if (url.pathname === '/' && get) return cachedHome(request, page(origin));
-    if (url.pathname === '/robots.txt') return text(ROBOTS);
+    if (url.pathname === '/llms.txt') return new Response('# Gardener\n\n> Render a GitHub repository as a visual tower.\n\n## Links\n- [Gardener](https://gardener.flisk.si/)\n- [Source](https://github.com/flisk-sh/gardener)\n', { headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'public, max-age=86400' } });
+    if (url.pathname === '/robots.txt') return new Response(ROBOTS, { headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'public, max-age=86400' } });
     if (url.pathname === '/sitemap.xml') return new Response(SITEMAP, { headers: { 'content-type': 'application/xml; charset=utf-8' } });
     if (url.pathname === '/icon.svg') return new Response(ICON, { headers: { 'content-type': 'image/svg+xml', 'cache-control': 'public, max-age=86400' } });
+    if (url.pathname === '/apple-touch-icon.png') return new Response(appleTouchIcon, { headers: { 'content-type': 'image/png', 'cache-control': 'public, max-age=31536000, immutable' } });
     if (url.pathname === '/sample.svg') return new Response(SAMPLE, { headers: { ...SVG, 'cache-control': 'public, max-age=86400' } });
 
     if (url.pathname === '/check' && get) {
@@ -220,4 +224,4 @@ const app = {
 };
 
 // Every response of this Worker carries the baseline security headers (see security-headers.js).
-export default { fetch: async (...args) => withSecurityHeaders(await app.fetch(...args)) };
+export default { fetch: traced(async (...args) => withSecurityHeaders(await app.fetch(...args))) };

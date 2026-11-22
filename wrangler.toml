@@ -5,6 +5,11 @@ compatibility_date = "2026-10-01"
 # gardener.flisk.si on the flisk.si zone (same Cloudflare account as diagram.flisk.si).
 routes = [{ pattern = "gardener.flisk.si", custom_domain = true }]
 
+# Problems go to traces.flisk.si (flisk-sh/traces). Secret TRACE_KEY is this app's key there.
+[[services]]
+binding = "TRACES"
+service = "flisk-traces"
+
 # Wolf runs on Workers AI: Qwen2.5-Coder 32B, the model flisk-wolf is made from.
 [ai]
 binding = "AI"
