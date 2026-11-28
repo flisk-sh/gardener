@@ -179,7 +179,13 @@ const app = {
     }
 
     const m = url.pathname.match(/^\/([^/]+)\/([^/]+?)(?:\.(svg|json))?$/);
-    if (!m || !get) {
+    // A dot-directory such as /.well-known/ looks like owner/repo to the
+    // matcher above, but it is never a GitHub repo. Scanners probing
+    // security.txt must get a real 404, not a tower page with HTTP 200.
+    const dotted = url.pathname.split('/').some(
+      (part) => part.startsWith('.') && !part.startsWith('..'),
+    );
+    if (!m || !get || dotted) {
       const accept = request.headers.get('accept') || '';
       const acceptsHtml = accept.split(',').some((range) => {
         const [type, ...params] = range.toLowerCase().split(';').map((part) => part.trim());
