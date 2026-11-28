@@ -179,7 +179,7 @@ const app = {
     }
 
     const m = url.pathname.match(/^\/([^/]+)\/([^/]+?)(?:\.(svg|json))?$/);
-    if (!m || !get) {
+    if (!m || !get || url.pathname.startsWith('/.well-known/')) {
       const accept = request.headers.get('accept') || '';
       const acceptsHtml = accept.split(',').some((range) => {
         const [type, ...params] = range.toLowerCase().split(';').map((part) => part.trim());
